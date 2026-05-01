@@ -29,7 +29,9 @@ jobs:
           git config user.name "Nova Factory"
           git config user.email "factory@nova.build"
 
-      - name: Run factory
+      # Phase 1: agents run, files written, committed to feature branch, pushed
+      - name: Factory — build phase
+        id: factory_build
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
@@ -38,24 +40,57 @@ jobs:
           NOTION_RUNS_DB_ID: ${{ secrets.NOTION_RUNS_DB_ID }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: PYTHONPATH=scripts python scripts/factory_run.py ${{ github.event.client_payload.feature_id }}
+        run: |
+          PYTHONPATH=scripts python scripts/factory_run.py build ${{ github.event.client_payload.feature_id }}
 
+      # Quality gates — run against the generated code before any merge
       - name: Install app dependencies
-        if: hashFiles('requirements.txt') != ''
+        if: steps.factory_build.outcome == 'success' && hashFiles('requirements.txt') != ''
         run: pip install -r requirements.txt
 
-      - name: Lint and type-check
-        if: hashFiles('app/**/*.py') != ''
+      - name: Lint (ruff)
+        if: steps.factory_build.outcome == 'success' && hashFiles('app/**/*.py') != ''
         run: |
-          pip install ruff mypy --quiet
-          ruff check app/ || true
+          pip install ruff --quiet
+          ruff check app/
+
+      - name: Type check (mypy)
+        if: steps.factory_build.outcome == 'success' && hashFiles('app/**/*.py') != ''
+        run: |
+          pip install mypy --quiet
           mypy app/ --ignore-missing-imports --no-error-summary || true
 
       - name: Run tests
-        if: hashFiles('tests/**/*.py') != '' || hashFiles('tests/*.py') != ''
+        if: steps.factory_build.outcome == 'success'
         run: |
           pip install pytest pytest-asyncio httpx --quiet
           pytest tests/ -x -q --tb=short
+
+      # Phase 2: quality gates passed — create PR and merge
+      - name: Factory — merge phase
+        if: success()
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_FEATURES_DB_ID: ${{ secrets.NOTION_FEATURES_DB_ID }}
+          NOTION_RUNS_DB_ID: ${{ secrets.NOTION_RUNS_DB_ID }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          PYTHONPATH=scripts python scripts/factory_run.py merge ${{ github.event.client_payload.feature_id }}
+
+      # On any failure after the build phase: update Notion and clean up branch
+      - name: Factory — mark failed
+        if: failure() && steps.factory_build.outcome == 'success'
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_FEATURES_DB_ID: ${{ secrets.NOTION_FEATURES_DB_ID }}
+          NOTION_RUNS_DB_ID: ${{ secrets.NOTION_RUNS_DB_ID }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          PYTHONPATH=scripts python scripts/factory_run.py fail \
+            ${{ github.event.client_payload.feature_id }} \
+            "Quality gate failure — see GitHub Actions logs for details"
 
       - name: Trigger deploy
         if: success()
