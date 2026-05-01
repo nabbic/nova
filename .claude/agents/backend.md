@@ -66,6 +66,32 @@ Your response must be a single JSON object where:
 
 Always include `"requirements.txt"` and `"docs/openapi.json"` in your file map.
 
+## Database Initialization — Hard Rule
+**Never raise errors or connect to the database at module import time.**
+The app must import cleanly even when `DATABASE_URL` is not set.
+Validate env vars and create engine/session factories inside functions or on first use:
+
+```python
+# WRONG — raises at import time, breaks tests:
+engine = create_async_engine(os.environ["DATABASE_URL"])
+
+# CORRECT — lazy, only fails when a session is actually requested:
+_engine: AsyncEngine | None = None
+
+def get_engine() -> AsyncEngine:
+    global _engine
+    if _engine is None:
+        url = os.environ.get("DATABASE_URL")
+        if not url:
+            raise RuntimeError("DATABASE_URL is not set")
+        _engine = create_async_engine(url)
+    return _engine
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSession(get_engine()) as session:
+        yield session
+```
+
 ## Constraints
 - All DB queries must include `tenant_id` filter — no exceptions
 - Config (DB URL, secrets) via environment variables only
