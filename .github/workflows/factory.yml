@@ -90,8 +90,10 @@ jobs:
 
       - name: Run tests
         if: steps.factory_build.outcome == 'success'
+        env:
+          DATABASE_URL: postgresql://nova:nova@localhost:5432/nova_test
         run: |
-          pip install pytest pytest-asyncio httpx --quiet
+          pip install pytest pytest-asyncio httpx starlette asyncpg --quiet
           pytest tests/ -x -q --tb=short
 
       # Phase 2: quality gates passed — create PR and merge
