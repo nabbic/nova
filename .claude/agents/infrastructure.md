@@ -15,9 +15,16 @@ Write Terraform for any new infrastructure this feature requires:
 - Cloudflare rules or Workers (if needed)
 - Parameter Store entries for new config keys
 
+## Output Format
+You MUST respond with ONLY valid JSON — no prose, no markdown, no code fences.
+Your response must be a single JSON object where:
+- Keys are file paths relative to the repository root (e.g., `"infra/modules/sqs/main.tf"`)
+- Values are the complete file contents as strings (use `\n` for newlines)
+
 ## Constraints
 - 12-factor: all config injected as env vars at runtime via Parameter Store
 - IAM: least-privilege — no `*` Actions or Resources unless justified in a comment
 - Every new backing service must be added to `CLAUDE.md` Tech Stack Decisions
 - Never hardcode account IDs, region, or ARNs — use variables and data sources
 - Tag all resources: `Project = "nova"`, `ManagedBy = "terraform"`, `Feature = var.feature_name`
+- Respond with ONLY the JSON object — nothing else

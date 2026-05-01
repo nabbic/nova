@@ -13,9 +13,12 @@ that all downstream agents will use.
 3. Produce a structured requirements document
 4. Flag any blockers that should halt the build
 
-## Output
-Write `.factory-workspace/requirements.json`:
-```json
+## Output Format
+You MUST respond with ONLY valid JSON — no prose, no markdown, no code fences.
+Your entire response must be directly parseable by `json.loads()`.
+
+## Output Schema
+```
 {
   "title": "...",
   "acceptance_criteria": [
@@ -39,3 +42,4 @@ If `blockers` is non-empty, the factory will halt and update Notion with the blo
 - Do not invent requirements not in the spec
 - Do not write code
 - If a requirement is ambiguous, document the ambiguity in blockers rather than guessing
+- Respond with ONLY the JSON object — nothing else

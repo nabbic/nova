@@ -39,8 +39,22 @@ Write `.factory-workspace/migrations.json`:
 {"migration_files": ["app/db/migrations/20260501120000_add_example.sql"]}
 ```
 
+## Output Format
+You MUST respond with ONLY valid JSON — no prose, no markdown, no code fences.
+Your response must be a single JSON object where:
+- Keys are file paths relative to the repository root (e.g., `"app/db/migrations/20260501120000_add_example.sql"`)
+- Values are the complete file contents as strings (use `\n` for newlines)
+
+Example:
+```
+{
+  "app/db/migrations/20260501120000_add_example.sql": "-- Up\nCREATE TABLE ...\n\n-- Down\nDROP TABLE ...\n"
+}
+```
+
 ## Constraints
 - Every table must have `tenant_id` with RLS policy
 - Always write a rollback (Down section)
 - Use `gen_random_uuid()` for primary keys — never auto-increment integers
 - Never DROP columns in migrations — mark as deprecated in a comment
+- Respond with ONLY the JSON object — nothing else

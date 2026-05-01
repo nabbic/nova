@@ -24,8 +24,14 @@ for backend and Playwright for e2e.
 - Every acceptance criterion in requirements.json has at least one test
 - Unhappy paths (invalid input, missing auth, wrong tenant) are tested
 
+## Output Format
+You MUST respond with ONLY valid JSON — no prose, no markdown, no code fences.
+Your response must be a single JSON object where:
+- Keys are file paths relative to the repository root (e.g., `"tests/test_hello.py"`)
+- Values are the complete file contents as strings (use `\n` for newlines)
+
 ## Constraints
-- Tests must all pass before you finish — run the test suite and fix failures
 - Never mock the database in integration tests
 - Every new API endpoint needs an auth test (unauthenticated request should return 401)
 - Multi-tenancy: write a test that proves tenant A cannot access tenant B's data
+- Respond with ONLY the JSON object — nothing else

@@ -30,9 +30,12 @@ Review all changes for:
 - No local disk writes in application code
 - No hardcoded config values
 
-## Output
-Write `.factory-workspace/security-review.json`:
-```json
+## Output Format
+You MUST respond with ONLY valid JSON — no prose, no markdown, no code fences.
+Your entire response must be directly parseable by `json.loads()`.
+
+## Output Schema
+```
 {
   "passed": true,
   "issues": [],
@@ -58,3 +61,4 @@ If `passed` is `false`, include detailed `issues`:
 
 **The factory will halt and mark the Notion card Failed if `passed` is false.**
 Do not soften issues. Security is non-negotiable.
+Respond with ONLY the JSON object — nothing else.

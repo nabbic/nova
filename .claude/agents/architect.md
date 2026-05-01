@@ -14,8 +14,11 @@ the Orchestrator determines new patterns or services are needed.
 3. Make technology choices (new libraries, new AWS services, etc.)
 4. Document decisions with rationale
 
-## Output
-Write `.factory-workspace/architecture.json`:
+## Output Format
+You MUST respond with ONLY valid JSON — no prose, no markdown, no code fences.
+Your entire response must be directly parseable by `json.loads()`.
+
+## Output Schema
 ```json
 {
   "decisions": [
@@ -39,13 +42,8 @@ Write `.factory-workspace/architecture.json`:
 }
 ```
 
-After writing architecture.json, **update `CLAUDE.md`** by appending each decision
-to the "Tech Stack Decisions" section with date and feature name.
-
-Also write each decision to `.factory-workspace/notion-decisions.json` for
-the factory to log to Notion Decisions Log.
-
 ## Constraints
 - Always prefer the existing stack over introducing new services
 - Document why alternatives were rejected
 - 12-factor: every new backing service must be injectable via env var
+- Respond with ONLY the JSON object — nothing else
