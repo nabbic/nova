@@ -38,10 +38,23 @@ def create_features_db(parent_page_id: str) -> str:
                     ]
                 }
             },
+            "Description": {"rich_text": {}},
+            "Acceptance Criteria": {"rich_text": {}},
             "Tech Notes": {"rich_text": {}},
+            "Out of Scope": {"rich_text": {}},
+            "Affected Roles": {
+                "multi_select": {
+                    "options": [
+                        {"name": "Admin", "color": "red"},
+                        {"name": "User", "color": "blue"},
+                        {"name": "Guest", "color": "gray"},
+                    ]
+                }
+            },
+            "Design URL": {"url": {}},
+            "Feature Flag": {"rich_text": {}},
             "PR Link": {"url": {}},
             "Deploy URL": {"url": {}},
-            "Agent Run ID": {"rich_text": {}},
             "Error Log": {"rich_text": {}},
         },
     )

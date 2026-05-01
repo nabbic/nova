@@ -6,6 +6,7 @@ Usage: PYTHONPATH=scripts python scripts/factory_run.py <feature_id>
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -44,11 +45,23 @@ def load_spec(feature_id: str) -> dict:
         items = props.get("Title", {}).get("title", [])
         return "".join(i["plain_text"] for i in items)
 
+    def multi_select(key: str) -> list[str]:
+        items = props.get(key, {}).get("multi_select", [])
+        return [i["name"] for i in items]
+
+    def url_field(key: str) -> str:
+        return props.get(key, {}).get("url") or ""
+
     return {
         "feature_id": feature_id,
         "title": title_text(),
         "description": rich_text("Description") or rich_text("Tech Notes"),
         "tech_notes": rich_text("Tech Notes"),
+        "acceptance_criteria": rich_text("Acceptance Criteria"),
+        "out_of_scope": rich_text("Out of Scope"),
+        "affected_roles": multi_select("Affected Roles"),
+        "design_url": url_field("Design URL"),
+        "feature_flag": rich_text("Feature Flag"),
     }
 
 
@@ -82,9 +95,22 @@ def log_run(
     )
 
 
+def delete_remote_branch(branch_name: str) -> None:
+    try:
+        subprocess.run(
+            ["git", "push", "origin", "--delete", branch_name],
+            check=True,
+            capture_output=True,
+        )
+        print(f"Cleaned up remote branch: {branch_name}")
+    except subprocess.CalledProcessError:
+        pass  # Branch may not have been pushed yet — that's fine
+
+
 def main(feature_id: str) -> None:
     start = time.time()
     agents_fired: list[str] = []
+    branch_name: str | None = None
 
     if WORKSPACE.exists():
         shutil.rmtree(WORKSPACE)
@@ -106,7 +132,7 @@ def main(feature_id: str) -> None:
 
         for agent_name in agents_to_run:
             print(f"Running {agent_name}...")
-            run_agent(agent_name)
+            run_agent(agent_name, plan)
             agents_fired.append(agent_name)
 
             if agent_name == "spec-analyst":
@@ -147,6 +173,8 @@ def main(feature_id: str) -> None:
         set_status(feature_id, "Failed", {
             "Error Log": {"rich_text": [{"text": {"content": error_msg[:2000]}}]},
         })
+        if branch_name:
+            delete_remote_branch(branch_name)
         sys.exit(1)
 
 

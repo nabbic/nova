@@ -56,13 +56,23 @@ def _call_agent(agent_name: str, user_message: str) -> str:
     return message.content[0].text
 
 
-def run_agent(agent_name: str) -> str:
+def _build_agent_context(agent_name: str, plan: dict) -> str:
+    """Builds the user message for an agent: context + any orchestrator notes for this agent."""
+    context = _load_context()
+    notes = plan.get("notes", {}).get(agent_name, "")
+    if notes:
+        context = f"# Orchestrator Notes for {agent_name}\n{notes}\n\n{context}"
+    return context
+
+
+def run_agent(agent_name: str, plan: dict = None) -> str:
     """Runs an agent with accumulated workspace context.
 
     Workspace agents save their JSON response to .factory-workspace/.
     Code agents parse their response as a file map and write each file to disk.
+    Orchestrator notes from the plan are surfaced at the top of each agent's context.
     """
-    context = _load_context()
+    context = _build_agent_context(agent_name, plan or {})
     response = _call_agent(agent_name, context)
 
     if agent_name in WORKSPACE_AGENTS:

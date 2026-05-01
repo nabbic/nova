@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install factory dependencies
         run: pip install anthropic requests
 
       - name: Configure git identity
@@ -39,6 +39,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: PYTHONPATH=scripts python scripts/factory_run.py ${{ github.event.client_payload.feature_id }}
+
+      - name: Install app dependencies
+        if: hashFiles('requirements.txt') != ''
+        run: pip install -r requirements.txt
+
+      - name: Lint and type-check
+        if: hashFiles('app/**/*.py') != ''
+        run: |
+          pip install ruff mypy --quiet
+          ruff check app/ || true
+          mypy app/ --ignore-missing-imports --no-error-summary || true
+
+      - name: Run tests
+        if: hashFiles('tests/**/*.py') != '' || hashFiles('tests/*.py') != ''
+        run: |
+          pip install pytest pytest-asyncio httpx --quiet
+          pytest tests/ -x -q --tb=short
 
       - name: Trigger deploy
         if: success()

@@ -24,6 +24,7 @@ Your entire response must be directly parseable by `json.loads()`.
   "feature_id": "<id from spec>",
   "title": "<feature title>",
   "summary": "One sentence describing what this feature does",
+  "spec": <embed the full feature spec JSON here so downstream agents have it>,
   "agents": ["spec-analyst", "architect", "database", "backend", "frontend", "infrastructure", "test", "security-reviewer"],
   "notes": {
     "spec-analyst": "Specific guidance for this agent",
@@ -37,6 +38,9 @@ Your entire response must be directly parseable by `json.loads()`.
   }
 }
 ```
+
+`spec` must be the full feature spec object passed to you — embed it verbatim so
+downstream agents (especially spec-analyst) can read it from `plan.json`.
 
 The `agents` array lists only the agents that WILL run (not skipped ones).
 The `skip_reason` map explains why each skipped agent was omitted.

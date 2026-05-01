@@ -16,6 +16,13 @@ node_modules/
 # Factory workspace (ephemeral per run)
 .factory-workspace/
 
+# Serena IDE tooling
+.serena/
+
+# Build artifacts
+*.zip
+.build/
+
 # Secrets
 .env
 *.pem
