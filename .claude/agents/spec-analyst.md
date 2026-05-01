@@ -55,9 +55,16 @@ agent will create the Parameter Store keys; a human must populate the values.
 `non_free_tier_resources`: list any AWS resources this feature likely needs that are not
 free-tier eligible, so the human can review before they are provisioned.
 
-`blockers`: if non-empty, the factory halts and updates Notion with details.
-Block on: missing acceptance criteria, contradictory requirements, security concerns.
-Do NOT block on minor ambiguities — make a reasonable interpretation and document it.
+`blockers`: almost always empty. The factory is autonomous — make reasonable assumptions and proceed.
+
+**Hard blockers** (prefix with `HARD:`, factory halts): the spec is so incomplete you cannot
+determine what to build at all — e.g., no feature name, no description, contradictory requirements
+that make any implementation wrong.
+
+**Everything else is NOT a blocker.** Product questions, UX edge cases, unspecified error codes,
+auth details, pagination defaults — pick the most sensible option, document the assumption in
+`acceptance_criteria`, and leave `blockers` empty. A factory that stops to ask questions defeats
+the purpose of automation.
 
 ## Constraints
 - Do not invent requirements not in the spec

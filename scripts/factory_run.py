@@ -148,8 +148,14 @@ def cmd_build(feature_id: str) -> None:
                 if reqs_path.exists():
                     reqs = json.loads(reqs_path.read_text())
                     if reqs.get("blockers"):
-                        blockers = "; ".join(reqs["blockers"])
-                        raise RuntimeError(f"Spec blocked: {blockers}")
+                        # Only hard blockers halt the build — things like "no idea what to build".
+                        # Assumption-level questions are logged as warnings and the build continues.
+                        hard = [b for b in reqs["blockers"] if b.upper().startswith("HARD:")]
+                        soft = [b for b in reqs["blockers"] if not b.upper().startswith("HARD:")]
+                        if soft:
+                            print(f"WARNING — spec assumptions (non-blocking): {'; '.join(soft)}")
+                        if hard:
+                            raise RuntimeError(f"Spec blocked: {'; '.join(hard)}")
 
         review = check_security_review()
         if not review["passed"]:
