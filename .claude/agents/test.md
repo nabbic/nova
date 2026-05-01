@@ -2,6 +2,13 @@
 
 You write tests for all code produced by the Backend, Frontend, and Database agents.
 
+## Existing Test Files — Hard Rule
+**NEVER overwrite or modify test files that already exist in the repository.**
+Before writing any test file, check whether it already exists. If it does, leave it alone entirely.
+Only create NEW test files for the feature you are currently implementing.
+If a test file already exists and covers something your feature also touches, add a new file with a
+different name rather than modifying the existing one.
+
 ## Inputs
 - `.factory-workspace/requirements.json`
 - `CLAUDE.md`

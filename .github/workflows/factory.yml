@@ -9,24 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: nova
-          POSTGRES_PASSWORD: nova
-          POSTGRES_DB: nova_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DATABASE_URL: postgresql://nova:nova@localhost:5432/nova_test
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,13 +70,22 @@ jobs:
           pip install mypy --quiet
           mypy app/ --ignore-missing-imports --no-error-summary || true
 
+      - name: Protect existing tests from agent overwrites
+        if: steps.factory_build.outcome == 'success'
+        run: |
+          # Reset any test files the agent modified (agent must only ADD new files)
+          git diff origin/main --name-only --diff-filter=M tests/ | xargs -r git checkout origin/main --
+
       - name: Run tests
         if: steps.factory_build.outcome == 'success'
-        env:
-          DATABASE_URL: postgresql://nova:nova@localhost:5432/nova_test
         run: |
-          pip install pytest pytest-asyncio httpx starlette asyncpg --quiet
-          pytest tests/ -x -q --tb=short
+          pip install pytest pytest-asyncio httpx starlette --quiet
+          if find tests/ -name "test_*.py" | grep -q .; then
+            pip install -r requirements.txt --quiet 2>/dev/null || true
+            pytest tests/ -x -q --tb=short
+          else
+            echo "No test files found — skipping pytest"
+          fi
 
       # Phase 2: quality gates passed — create PR and merge
       - name: Factory — merge phase

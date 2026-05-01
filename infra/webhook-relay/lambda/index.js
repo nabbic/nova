@@ -12,7 +12,7 @@ exports.handler = async (event) => {
 
     // Notion webhook verification challenge
     if (body.verification_token) {
-      console.log("Verification challenge received — responding");
+      console.log("Verification token:", body.verification_token);
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
