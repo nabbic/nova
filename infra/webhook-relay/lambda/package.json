@@ -1,0 +1,7 @@
+{
+  "name": "nova-webhook-relay",
+  "version": "1.0.0",
+  "description": "Relays Notion webhooks to GitHub Actions",
+  "main": "index.js",
+  "dependencies": {}
+}
