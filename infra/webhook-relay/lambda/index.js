@@ -3,43 +3,86 @@ const https = require("https");
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
 const GITHUB_REPO = process.env.GITHUB_REPO;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const TARGET_STATUS = "Ready to Build";
 
 exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
 
-    if (!isReadyToBuild(body)) {
-      return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
+    // Notion webhook verification challenge
+    if (body.verification_token) {
+      console.log("Verification challenge received — responding");
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verification_token: body.verification_token }),
+      };
     }
 
-    const featureId = extractFeatureId(body);
+    // Only handle page property update events
+    if (body.type !== "page.properties_updated") {
+      return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: "not a property update" }) };
+    }
+
+    // Only act when Status was one of the changed properties
+    const updatedProperties = body?.data?.updated_properties || [];
+    if (!updatedProperties.includes("Status")) {
+      return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: "Status not changed" }) };
+    }
+
+    const featureId = body?.entity?.id;
     if (!featureId) {
-      return { statusCode: 400, body: JSON.stringify({ error: "No feature ID" }) };
+      return { statusCode: 400, body: JSON.stringify({ error: "No page ID in webhook payload" }) };
+    }
+
+    // Fetch the page to confirm Status is still "Ready to Build"
+    // (user may have changed it again before we processed the event)
+    const status = await getPageStatus(featureId);
+    if (status !== TARGET_STATUS) {
+      console.log(`Page ${featureId} Status is "${status}" — skipping`);
+      return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: `status is ${status}` }) };
     }
 
     await triggerGitHubActions(featureId);
+    console.log(`Triggered factory for feature ${featureId}`);
+    return { statusCode: 200, body: JSON.stringify({ triggered: true, featureId }) };
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ triggered: true, featureId }),
-    };
   } catch (err) {
     console.error("Relay error:", err);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
 
-function isReadyToBuild(body) {
-  const updates = body?.data?.properties || {};
-  const statusUpdate = updates["Status"];
-  if (!statusUpdate) return false;
-  const newValue = statusUpdate?.select?.name;
-  return newValue === TARGET_STATUS;
-}
+function getPageStatus(pageId) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: "api.notion.com",
+      path: `/v1/pages/${pageId}`,
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${NOTION_API_KEY}`,
+        "Notion-Version": "2022-06-28",
+      },
+    };
 
-function extractFeatureId(body) {
-  return body?.data?.id || null;
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        try {
+          const page = JSON.parse(data);
+          const status = page?.properties?.Status?.select?.name || null;
+          resolve(status);
+        } catch (e) {
+          reject(new Error(`Failed to parse Notion response: ${e.message}`));
+        }
+      });
+    });
+
+    req.on("error", reject);
+    req.end();
+  });
 }
 
 function triggerGitHubActions(featureId) {

@@ -56,10 +56,10 @@ resource "aws_lambda_function" "webhook_relay" {
 
   environment {
     variables = {
-      GITHUB_OWNER          = var.github_owner
-      GITHUB_REPO           = var.github_repo
-      GITHUB_TOKEN          = var.github_token
-      NOTION_WEBHOOK_SECRET = var.notion_webhook_secret
+      GITHUB_OWNER    = var.github_owner
+      GITHUB_REPO     = var.github_repo
+      GITHUB_TOKEN    = var.github_token
+      NOTION_API_KEY  = var.notion_api_key
     }
   }
 

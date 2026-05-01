@@ -15,8 +15,8 @@ variable "github_token" {
   sensitive   = true
 }
 
-variable "notion_webhook_secret" {
-  description = "Notion webhook verification secret"
+variable "notion_api_key" {
+  description = "Notion integration API key — used to fetch page status before triggering factory"
   type        = string
   sensitive   = true
 }
