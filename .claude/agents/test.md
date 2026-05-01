@@ -35,3 +35,21 @@ Your response must be a single JSON object where:
 - Every new API endpoint needs an auth test (unauthenticated request should return 401)
 - Multi-tenancy: write a test that proves tenant A cannot access tenant B's data
 - Respond with ONLY the JSON object — nothing else
+
+## FastAPI Testing — Hard Rule
+**Always use `starlette.testclient.TestClient` for synchronous tests against FastAPI apps.**
+Never use `httpx.Client(transport=ASGITransport(...))` — `ASGITransport` is async-only and
+raises `AttributeError: 'ASGITransport' object has no attribute '__enter__'`.
+
+```python
+from starlette.testclient import TestClient
+from app.main import app
+
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
+```
+
+If you need async tests, use `httpx.AsyncClient` with `ASGITransport` and `@pytest.mark.asyncio`.
+Default to `TestClient` unless async is explicitly required.
