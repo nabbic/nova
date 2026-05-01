@@ -22,6 +22,15 @@ data "archive_file" "lambda_zip" {
   output_path = "${path.module}/.build/webhook-relay.zip"
 }
 
+locals {
+  # Notion webhook source IPs + developer IP for testing
+  allowed_ips = [
+    "131.149.232.0/21", # Notion (all regions)
+    "208.103.161.0/24", # Notion (additional range)
+    "108.235.54.160/32", # Developer
+  ]
+}
+
 resource "aws_iam_role" "lambda_exec" {
   name = "nova-webhook-relay-exec"
 
@@ -56,10 +65,10 @@ resource "aws_lambda_function" "webhook_relay" {
 
   environment {
     variables = {
-      GITHUB_OWNER    = var.github_owner
-      GITHUB_REPO     = var.github_repo
-      GITHUB_TOKEN    = var.github_token
-      NOTION_API_KEY  = var.notion_api_key
+      GITHUB_OWNER   = var.github_owner
+      GITHUB_REPO    = var.github_repo
+      GITHUB_TOKEN   = var.github_token
+      NOTION_API_KEY = var.notion_api_key
     }
   }
 
@@ -69,12 +78,90 @@ resource "aws_lambda_function" "webhook_relay" {
   }
 }
 
-resource "aws_lambda_function_url" "webhook_relay" {
-  function_name      = aws_lambda_function.webhook_relay.function_name
-  authorization_type = "NONE"
+# API Gateway REST API with IP-based resource policy
+# NON-FREE-TIER: API Gateway costs $3.50/million requests after free tier (1M/month for 12 months)
+resource "aws_api_gateway_rest_api" "webhook_relay" {
+  name = "nova-webhook-relay"
 
-  cors {
-    allow_origins = ["https://api.notion.com"]
-    allow_methods = ["POST"]
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+
+  # Allow only Notion IPs and developer IP; deny everything else
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "execute-api:Invoke"
+        Resource  = "arn:aws:execute-api:${var.aws_region}:*:*/*/*"
+        Condition = {
+          IpAddress = {
+            "aws:SourceIp" = local.allowed_ips
+          }
+        }
+      },
+      {
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "execute-api:Invoke"
+        Resource  = "arn:aws:execute-api:${var.aws_region}:*:*/*/*"
+        Condition = {
+          NotIpAddress = {
+            "aws:SourceIp" = local.allowed_ips
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Project   = "nova"
+    ManagedBy = "terraform"
+  }
+}
+
+resource "aws_api_gateway_method" "webhook_post" {
+  rest_api_id   = aws_api_gateway_rest_api.webhook_relay.id
+  resource_id   = aws_api_gateway_rest_api.webhook_relay.root_resource_id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "webhook_lambda" {
+  rest_api_id             = aws_api_gateway_rest_api.webhook_relay.id
+  resource_id             = aws_api_gateway_rest_api.webhook_relay.root_resource_id
+  http_method             = aws_api_gateway_method.webhook_post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.webhook_relay.invoke_arn
+}
+
+resource "aws_lambda_permission" "apigw" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.webhook_relay.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.webhook_relay.execution_arn}/*/*"
+}
+
+resource "aws_api_gateway_deployment" "webhook_relay" {
+  depends_on  = [aws_api_gateway_integration.webhook_lambda]
+  rest_api_id = aws_api_gateway_rest_api.webhook_relay.id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "webhook_relay" {
+  deployment_id = aws_api_gateway_deployment.webhook_relay.id
+  rest_api_id   = aws_api_gateway_rest_api.webhook_relay.id
+  stage_name    = "prod"
+
+  tags = {
+    Project   = "nova"
+    ManagedBy = "terraform"
   }
 }
