@@ -48,11 +48,21 @@ jobs:
         if: steps.factory_build.outcome == 'success' && hashFiles('requirements.txt') != ''
         run: pip install -r requirements.txt
 
-      - name: Lint (ruff)
+      - name: Auto-format and fix lint (ruff)
         if: steps.factory_build.outcome == 'success' && hashFiles('app/**/*.py') != ''
         run: |
           pip install ruff --quiet
-          ruff check app/
+          ruff format app/
+          ruff check app/ --fix --unsafe-fixes || true
+          if ! git diff --quiet; then
+            git add app/
+            git commit -m "style: auto-fix ruff formatting and lint issues"
+            git push origin HEAD
+          fi
+
+      - name: Lint gate (ruff)
+        if: steps.factory_build.outcome == 'success' && hashFiles('app/**/*.py') != ''
+        run: ruff check app/
 
       - name: Type check (mypy)
         if: steps.factory_build.outcome == 'success' && hashFiles('app/**/*.py') != ''

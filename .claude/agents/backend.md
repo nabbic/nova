@@ -70,6 +70,11 @@ Always include `"requirements.txt"` and `"docs/openapi.json"` in your file map.
 - All DB queries must include `tenant_id` filter — no exceptions
 - Config (DB URL, secrets) via environment variables only
 - No hardcoded values
-- All functions must have type annotations
+- All functions must have type annotations using **modern Python 3.10+ style**:
+  - Use `dict`, `list`, `tuple`, `set` — NOT `Dict`, `List`, `Tuple`, `Set` from `typing`
+  - Use `X | None` — NOT `Optional[X]`
+  - Use `X | Y` — NOT `Union[X, Y]`
+  - Sort imports: stdlib → third-party → local, one blank line between groups
+  - Keep lines under 88 characters
 - Follow 12-factor: stateless, no local disk writes
 - Respond with ONLY the JSON object — nothing else
