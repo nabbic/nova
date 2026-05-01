@@ -1,0 +1,54 @@
+name: Nova Factory
+
+on:
+  repository_dispatch:
+    types: [factory-trigger]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install anthropic requests
+
+      - name: Configure git identity
+        run: |
+          git config user.name "Nova Factory"
+          git config user.email "factory@nova.build"
+
+      - name: Run factory
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_FEATURES_DB_ID: ${{ secrets.NOTION_FEATURES_DB_ID }}
+          NOTION_DECISIONS_DB_ID: ${{ secrets.NOTION_DECISIONS_DB_ID }}
+          NOTION_RUNS_DB_ID: ${{ secrets.NOTION_RUNS_DB_ID }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: PYTHONPATH=scripts python scripts/factory_run.py ${{ github.event.client_payload.feature_id }}
+
+      - name: Trigger deploy
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy.yml',
+              ref: 'main',
+            })
