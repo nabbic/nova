@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(python *)",
+      "Bash(pip *)",
+      "Bash(python3 *)",
+      "Bash(pip3 *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(mkdir *)",
+      "Bash(rm *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(find *)",
+      "Bash(echo *)",
+      "Bash(env)",
+      "Bash(env *)",
+      "Bash(sleep *)",
+      "Bash(chmod *)",
+      "Bash(touch *)",
+      "PowerShell(git *)",
+      "PowerShell(gh *)",
+      "PowerShell(python *)",
+      "PowerShell(pip *)",
+      "PowerShell(Get-* *)",
+      "PowerShell(Set-* *)",
+      "PowerShell(New-* *)",
+      "PowerShell(Remove-* *)",
+      "PowerShell(Test-* *)",
+      "Read(C:\\Claude\\Nova\\nova\\**)",
+      "Write(C:\\Claude\\Nova\\nova\\**)",
+      "Edit(C:\\Claude\\Nova\\nova\\**)",
+      "Glob(**)",
+      "Grep(**)"
+    ]
+  }
+}
