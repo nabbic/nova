@@ -1,8 +1,19 @@
 # Nova — Master Project Context
 
 ## Product
-Nova is a multi-tenant SaaS web application. Details TBD by product spec.
-Target users: TBD.
+Nova is a **Technical Due Diligence (Tech DD) Platform** for PE M&A transactions.
+
+It is a neutral SaaS platform that sits between buyers (PE firms) and sellers (target
+companies), automating technical diligence gathering, AI-powered analysis, and report
+generation. The platform is paid for by the buyer; the seller connects their tooling
+via cloud connectors and is guided through the process.
+
+**Target users:**
+- **Buyers** — PE firm deal teams; see curated findings and risk-scored reports
+- **External Advisors** — independent technical advisors engaged per-deal; see raw
+  scan data and annotate findings
+- **Sellers** — target company engineering teams; connect tooling, respond to
+  questionnaires, manage their data per-engagement
 
 ## Factory
 This repository is built and maintained by the Nova Software Factory — an autonomous
@@ -15,6 +26,10 @@ Never manually edit files that agents own unless you update this doc to reflect 
 - Secrets via AWS Parameter Store / Secrets Manager
 - Stateless processes — no local disk state between requests
 - Logs to stdout/stderr only
+- **API-only connectivity** — agents expose an API; cloud connectors push data to it;
+  the OS-level agent calls out to the platform API. Under NO circumstances are
+  network connections established INTO seller environments. All data collection
+  happens over APIs and encrypted channels.
 
 ## API Design — Hard Requirement
 **All HTTP API endpoints MUST be built using OpenAPI (OAS 3.x).**
@@ -43,20 +58,79 @@ Never manually edit files that agents own unless you update this doc to reflect 
 |---|---|
 | Compute | ECS Fargate |
 | Database | RDS PostgreSQL |
-| Auth | AWS Cognito |
+| Auth | AWS Cognito (two user pools: buyer + seller) |
 | Edge | Cloudflare (CDN, DNS, WAF) |
 | IaC | Terraform |
+| Backend | FastAPI (Python) |
+| Frontend | React 18 + TypeScript |
 
-## Tech Stack Decisions (maintained by Architect agent)
-_Starts empty. Architect appends here as decisions are made._
+## Extended Stack (Tech DD Platform additions)
+| Concern | Choice | Notes |
+|---|---|---|
+| Async scan jobs | SQS + ECS workers | Fan-out per diligence category |
+| Caching / sessions | ElastiCache Redis | Sub-10ms reads, session state |
+| Evidence storage | S3 | Scan artefacts, uploaded evidence |
+| Vector search | OpenSearch (3-AZ) | pgvector NOT available on RDS |
+| Agent orchestration | LangGraph | Agent workflow graphs |
+| AI gateway | LiteLLM | Claude/OpenAI/Gemini/Bedrock routing |
+| Agent runtime | Amazon Bedrock AgentCore | Agent lifecycle management |
+| AI safety | Bedrock Guardrails | Input/output filtering |
+| Agent memory | AgentCore Memory | Cross-session context for agents |
+| AI observability | Langfuse or Arize | LLM tracing, token usage, latency |
+| OS-level agent | Go binary | Buyer-requestable escalation; outbound-only |
+
+## Multi-Tenancy Model
+- **Tenant key**: `buyer_org_id` — all queries must filter by this
+- Row-level security enforced at DB layer on all tables
+- Seller accounts are scoped **per engagement** — not global tenants
+- Two Cognito user pools: one for buyer users, one for seller users
+
+## Diligence Categories (8 Agents)
+Each category has an AI specialist agent. Default weights (sum to 100%) are stored
+in the `scoring_config` table (versioned) and are configurable per engagement.
+
+| # | Category | Default Weight |
+|---|---|---|
+| 1 | Security | 25% |
+| 2 | Compliance | 20% |
+| 3 | Infrastructure | 15% |
+| 4 | Code Quality | 15% |
+| 5 | Engineering Process | 12% |
+| 6 | Dependencies | 8% |
+| 7 | IT Operations | 10% |
+| 8 | Documentation | 5% |
+
+## Scoring Model
+Findings are scored on two independent axes:
+- **Financial Risk** (Critical / High / Medium / Low) — 60% weight
+- **Remediation Effort** (Days / Weeks / Months / Years) — 25% weight
+- Finding Count (10%) and Trend/Coverage (5%) also factor in
+
+All weights are stored in the `scoring_config` table, versioned. Reports record
+which config version produced them for reproducibility.
+
+## Engagement Lifecycle
+9 steps: Deal Room Created → Seller Invited → Seller Accepts → Cloud Connectors
+Connected → Autonomous Scan Runs → AI Synthesis → Advisor Review & Annotations →
+Buyer Report Delivered → Clarification Q&A → Deal Outcome
+
+## Data Retention Policy
+- **Deal closed**: Buyer retains curated report; raw scan data deleted within 30 days
+- **Deal abandoned**: 7-day seller offboarding period (seller completes connector
+  revocation checklist); buyer access suspended immediately; all data deleted after
+  offboarding period (buyer retains nothing)
 
 ## Coding Conventions
 - All code must have tests before merging
 - All tests must pass in CI before merging (pytest, ruff, mypy)
 - Security Reviewer must pass before any commit lands
 - Every Terraform change runs `terraform validate` and `terraform plan` before apply
-- Multi-tenancy: all queries must filter by `tenant_id` — row-level security enforced at DB layer
+- Multi-tenancy: all queries must filter by `buyer_org_id` — row-level security
+  enforced at DB layer
 - Backend agent always updates `requirements.txt` when adding new dependencies
+- Use Alembic for all database migrations (not raw SQL files)
+- Python: SQLAlchemy 2.x async (`mapped_column`, `AsyncSession`); modern type hints
+  (`X | None` not `Optional[X]`, `dict` not `Dict`)
 
 ## Agent Roles
 See `.claude/agents/` for each agent's system prompt.
@@ -64,9 +138,22 @@ Orchestrator coordinates all agents. Do not call agents directly.
 
 ## Repository Layout
 - `app/` — web application
+  - `app/api/routes/` — FastAPI route handlers (thin, delegate to services)
+  - `app/services/` — business logic
+  - `app/repositories/` — data access (always filter by `buyer_org_id`)
+  - `app/models/` — SQLAlchemy ORM models
+  - `app/schemas/` — Pydantic request/response schemas
+  - `app/core/` — config, database, auth utilities
+  - `app/db/migrations/` — Alembic migrations
+  - `app/workers/` — SQS consumer workers (async scan jobs)
+  - `app/agents/` — LangGraph agent definitions
+- `frontend/` — React 18 + TypeScript SPA
 - `infra/` — Terraform modules
 - `infra/bootstrap/` — one-time S3/DynamoDB state backend setup
 - `scripts/` — factory tooling
 - `.claude/agents/` — agent system prompts
 - `docs/` — specs and plans
 - `docs/openapi.json` — always up to date, committed by factory on API changes
+
+## Tech Stack Decisions (maintained by Architect agent)
+_See Extended Stack table above. Architect appends further decisions here as they are made._

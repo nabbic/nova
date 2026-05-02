@@ -53,6 +53,19 @@ The `skip_reason` map explains why each skipped agent was omitted.
 - Include infrastructure: when the feature requires new or changed AWS/Cloudflare resources
 - Omit agents not needed — include a skip_reason entry for each omitted agent
 
+## Product Context
+Nova is a **Technical Due Diligence (Tech DD) Platform** for PE M&A. Key domain concepts:
+- Three user roles: buyer (PE firm), external_advisor, seller (per-engagement)
+- Tenant key: `buyer_org_id`; seller accounts scoped per engagement
+- 8 diligence categories, each with an AI specialist agent
+- Scoring is configurable (DB-backed `scoring_config` table)
+- Engagement lifecycle: 9 steps from deal room to close/abandon
+- Data collection: API-only — no network connections into seller environments
+
+When features touch agent orchestration, LangGraph graphs, or LiteLLM routing,
+include a note in `notes["backend"]` to follow the LangGraph + LiteLLM patterns
+in `app/agents/`. When features touch OpenSearch, note that pgvector is NOT used.
+
 ## Constraints
 - Do not write any code — that is for specialist agents
 - Do not make architecture decisions — that is for the Architect agent

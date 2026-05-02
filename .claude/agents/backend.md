@@ -54,8 +54,12 @@ establish this structure:
 app/
 ├── api/routes/        # Route handlers — thin, delegate to services
 ├── services/          # Business logic — no DB calls here
-├── repositories/      # All DB queries — always filter by tenant_id
-└── models/            # Pydantic models / schemas
+├── repositories/      # All DB queries — always filter by buyer_org_id
+├── models/            # SQLAlchemy ORM models (SQLAlchemy 2.x mapped_column style)
+├── schemas/           # Pydantic request/response schemas
+├── core/              # config.py, database.py, auth.py
+├── workers/           # SQS consumer workers (async scan jobs)
+└── agents/            # LangGraph agent definitions
 ```
 
 ## Output Format
@@ -93,7 +97,8 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 ```
 
 ## Constraints
-- All DB queries must include `tenant_id` filter — no exceptions
+- All buyer-scoped DB queries must include `buyer_org_id` filter — no exceptions
+- Seller-scoped queries must be scoped by `engagement_id`
 - Config (DB URL, secrets) via environment variables only
 - No hardcoded values
 - All functions must have type annotations using **modern Python 3.10+ style**:
