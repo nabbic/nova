@@ -1,0 +1,14 @@
+{
+  "feature_id": "00000000-0000-0000-0000-000000000003",
+  "title": "Broken PRD missing stories",
+  "narrative_md": "This PRD intentionally omits the required `stories` field.",
+  "scope": {
+    "touches_db":       false,
+    "touches_frontend": false,
+    "touches_infra":    false,
+    "files_in_scope":   []
+  },
+  "hard_blockers":   [],
+  "risk_flags":      [],
+  "suggested_split": []
+}

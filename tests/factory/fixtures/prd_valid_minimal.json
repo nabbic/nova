@@ -1,0 +1,25 @@
+{
+  "feature_id": "00000000-0000-0000-0000-000000000001",
+  "title": "Add buyer engagement export endpoint",
+  "narrative_md": "Buyers need a JSON export of an engagement's findings.",
+  "stories": [
+    {
+      "id": "s1",
+      "description": "GET /api/engagements/{id}/export returns the engagement as JSON",
+      "acceptance_criteria": [
+        "Returns 200 with engagement data when authenticated as the owning buyer org",
+        "Returns 403 on buyer_org_id mismatch"
+      ],
+      "passes": false
+    }
+  ],
+  "scope": {
+    "touches_db":       false,
+    "touches_frontend": false,
+    "touches_infra":    false,
+    "files_in_scope":   ["app/", "tests/", "docs/openapi.json"]
+  },
+  "hard_blockers":   [],
+  "risk_flags":      [],
+  "suggested_split": []
+}

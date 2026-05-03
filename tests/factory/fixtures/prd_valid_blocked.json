@@ -1,0 +1,39 @@
+{
+  "feature_id": "00000000-0000-0000-0000-000000000002",
+  "title": "Build the entire seller portal",
+  "narrative_md": "Seller portal: invitations, connectors, dashboard, billing, reports.",
+  "stories": [
+    { "id": "s1", "description": "Seller invitation flow",     "acceptance_criteria": ["Invite email sent", "Token verified"], "passes": false },
+    { "id": "s2", "description": "Cloud connector wiring",     "acceptance_criteria": ["AWS connector OK", "GCP connector OK"], "passes": false },
+    { "id": "s3", "description": "Seller dashboard UI",        "acceptance_criteria": ["Lists engagements", "Shows status"], "passes": false },
+    { "id": "s4", "description": "Billing surface for sellers", "acceptance_criteria": ["Shows invoices"], "passes": false },
+    { "id": "s5", "description": "Per-engagement reports",     "acceptance_criteria": ["Renders findings"], "passes": false }
+  ],
+  "scope": {
+    "touches_db":       true,
+    "touches_frontend": true,
+    "touches_infra":    true,
+    "files_in_scope":   ["app/", "frontend/", "infra/", "tests/"]
+  },
+  "hard_blockers": [
+    {
+      "reason":  "feature_too_large",
+      "details": "5 stories, 4 domains touched (db+frontend+backend+infra) — breaches sizing rubric",
+      "suggested_split": [
+        "Seller invitation flow (auth + email)",
+        "Cloud connector wiring (one connector per feature)",
+        "Seller dashboard UI",
+        "Billing surface",
+        "Per-engagement reports"
+      ]
+    }
+  ],
+  "risk_flags": ["multi-domain", "high-token-output-risk"],
+  "suggested_split": [
+    "Seller invitation flow",
+    "Cloud connector wiring",
+    "Seller dashboard UI",
+    "Billing surface",
+    "Per-engagement reports"
+  ]
+}
