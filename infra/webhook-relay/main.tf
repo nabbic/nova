@@ -1,5 +1,12 @@
 terraform {
   required_version = ">= 1.7"
+  backend "s3" {
+    bucket         = "nova-terraform-state-577638385116"
+    key            = "webhook-relay/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "nova-terraform-locks"
+    encrypt        = true
+  }
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -17,9 +24,11 @@ provider "aws" {
 }
 
 data "terraform_remote_state" "factory" {
-  backend = "local"
+  backend = "s3"
   config = {
-    path = "${path.module}/../factory/terraform.tfstate"
+    bucket = "nova-terraform-state-577638385116"
+    key    = "factory/terraform.tfstate"
+    region = "us-east-1"
   }
 }
 
