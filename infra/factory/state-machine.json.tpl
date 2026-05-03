@@ -54,6 +54,21 @@
         "BackoffRate": 2.0
       }],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "MarkFailedAndRelease"}],
+      "Next": "LoadProjectContext"
+    },
+
+    "LoadProjectContext": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-load-project-context",
+        "Payload": {
+          "execution_id.$": "$$.Execution.Name"
+        }
+      },
+      "ResultPath": null,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 5, "MaxAttempts": 2, "BackoffRate": 2.0}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "MarkFailedAndRelease"}],
       "Next": "RunOrchestrator"
     },
 

@@ -3,6 +3,7 @@ locals {
     acquire_lock                 = { timeout = 30,  memory = 256  }
     release_lock                 = { timeout = 30,  memory = 256  }
     load_spec                    = { timeout = 60,  memory = 512  }
+    load_project_context         = { timeout = 30,  memory = 256  }
     run_orchestrator             = { timeout = 300, memory = 2048 }
     run_agent                    = { timeout = 600, memory = 2048 }
     evaluate_security            = { timeout = 30,  memory = 256  }
