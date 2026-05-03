@@ -1,0 +1,8 @@
+{
+  "expected_outcome": "plan_passes_no_blockers",
+  "title": "Factory v2 smoke — version v2 endpoint",
+  "description": "Add GET /api/version-v2 returning {\"version\": \"2.0\"}.",
+  "tech_notes": "Add to app/api/routes/version.py. Mirror the existing /api/version handler. Update docs/openapi.json.",
+  "acceptance_criteria": "- 200 with {\"version\": \"2.0\"} when called without auth\n- docs/openapi.json includes /api/version-v2",
+  "out_of_scope": "Auth changes; non-v2 endpoints"
+}

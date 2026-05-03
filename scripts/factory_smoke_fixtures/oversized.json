@@ -1,0 +1,8 @@
+{
+  "expected_outcome": "plan_blocks_with_feature_too_large",
+  "title": "Factory v2 smoke — full seller portal",
+  "description": "Build the entire seller portal: invitation flow, cloud connector wiring, dashboard UI, billing surface, per-engagement reports. Wire up the seller Cognito pool, add the seller_users table, build a React frontend at /seller/*, wire CloudFront origin behaviors.",
+  "tech_notes": "Multi-domain (db + backend + frontend + infra). Likely 30+ files changed across app/, frontend/, infra/, docs/.",
+  "acceptance_criteria": "- Sellers receive invitation emails\n- Sellers can accept invitations and create accounts\n- Sellers can connect AWS cloud connectors\n- Sellers can connect GCP cloud connectors\n- Seller dashboard lists engagements\n- Seller dashboard shows status\n- Sellers can see invoices\n- Seller portal has separate Cognito pool\n- Reports render findings\n- All routes filter by engagement_id and seller_org_id",
+  "out_of_scope": "Production rollout; feature flags"
+}

@@ -1,0 +1,8 @@
+{
+  "expected_outcome": "plan_passes_no_blockers",
+  "title": "Factory v2 smoke — engagement listing endpoint",
+  "description": "Add GET /api/engagements that lists engagements for the calling buyer org. Pagination via limit/offset query params.",
+  "tech_notes": "Use the existing engagements repository and tenant-filter pattern. Add response schema to docs/openapi.json. Cover with unit + integration tests.",
+  "acceptance_criteria": "- 200 with paginated list when authenticated as a buyer org user\n- 401 when unauthenticated\n- Empty list when no engagements exist for the org\n- docs/openapi.json includes the endpoint with query params and response schema",
+  "out_of_scope": "Filtering, sorting, search"
+}
