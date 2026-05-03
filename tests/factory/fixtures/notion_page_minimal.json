@@ -1,0 +1,29 @@
+{
+  "object": "page",
+  "id": "00000000-0000-0000-0000-000000000001",
+  "created_time": "2026-05-03T12:00:00Z",
+  "last_edited_time": "2026-05-03T12:30:00Z",
+  "url": "https://www.notion.so/Test-Feature-...",
+  "properties": {
+    "Title": {
+      "type": "title",
+      "title": [{ "plain_text": "Add buyer engagement export endpoint" }]
+    },
+    "Status": {
+      "type": "status",
+      "status": { "name": "Ready to Build" }
+    },
+    "Description": {
+      "type": "rich_text",
+      "rich_text": [{ "plain_text": "Buyers need a JSON export of an engagement's findings.\n\nGET /api/engagements/{id}/export should return the engagement payload." }]
+    },
+    "Tech Notes": {
+      "type": "rich_text",
+      "rich_text": [{ "plain_text": "Filter by buyer_org_id. Add to docs/openapi.json." }]
+    },
+    "Acceptance Criteria": {
+      "type": "rich_text",
+      "rich_text": [{ "plain_text": "- 200 with engagement data when authenticated as the owning buyer org\n- 403 on buyer_org_id mismatch" }]
+    }
+  }
+}
