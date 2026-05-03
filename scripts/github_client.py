@@ -1,3 +1,4 @@
+import json
 import subprocess
 
 
@@ -38,4 +39,25 @@ def approve_and_merge_pr(pr_url: str) -> None:
     # review step and merge directly. Branch protection rules are managed separately.
     subprocess.run(
         ["gh", "pr", "merge", pr_url, "--merge", "--delete-branch"], check=True
+    )
+
+
+def trigger_repository_dispatch(feature_id: str) -> None:
+    """Dispatch a factory-trigger event to start the factory for a feature.
+
+    Uses gh CLI which resolves {owner}/{repo} from the current git remote.
+    """
+    payload = json.dumps({
+        "event_type": "factory-trigger",
+        "client_payload": {"feature_id": feature_id},
+    })
+    subprocess.run(
+        [
+            "gh", "api", "repos/{owner}/{repo}/dispatches",
+            "--method", "POST",
+            "--input", "-",
+        ],
+        input=payload,
+        text=True,
+        check=True,
     )

@@ -53,6 +53,32 @@ The `skip_reason` map explains why each skipped agent was omitted.
 - Include infrastructure: when the feature requires new or changed AWS/Cloudflare resources
 - Omit agents not needed — include a skip_reason entry for each omitted agent
 
+## Dependency Context
+The feature spec may include a `dependencies` array. Each entry describes a feature
+that this one builds on top of:
+
+```json
+{
+  "id": "<notion page id>",
+  "title": "<feature title>",
+  "status": "Done",
+  "description": "<what the dependency built>"
+}
+```
+
+Use this to inform your `notes` for each agent. For example:
+- If a dependency built the core FastAPI app and SQLAlchemy models, tell the backend
+  agent which modules already exist so it imports rather than recreates them.
+- If a dependency built the Cognito auth middleware, tell the backend agent to use
+  that middleware rather than inventing new auth.
+- If a dependency established DB schema patterns (e.g. `buyer_org_id` on every table,
+  Alembic migrations), tell the database agent to follow those exact patterns.
+- If a dependency built the React auth context and router setup, tell the frontend
+  agent which contexts and hooks are available.
+
+If `dependencies` is empty or absent, the feature has no prerequisites and agents
+should build from scratch following the patterns in CLAUDE.md.
+
 ## Product Context
 Nova is a **Technical Due Diligence (Tech DD) Platform** for PE M&A. Key domain concepts:
 - Three user roles: buyer (PE firm), external_advisor, seller (per-engagement)

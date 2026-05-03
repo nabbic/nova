@@ -23,12 +23,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agents import run_agent, run_orchestrator, check_security_review
-from github_client import create_branch, commit_all, push_branch, create_pr, approve_and_merge_pr
-from notion_client import get_page, update_page, create_page
+from github_client import create_branch, commit_all, push_branch, create_pr, approve_and_merge_pr, trigger_repository_dispatch
+from notion_client import get_page, update_page, create_page, query_database
 
 ROOT = Path(__file__).parent.parent
 WORKSPACE = ROOT / ".factory-workspace"
 RUNS_DB = os.environ["NOTION_RUNS_DB_ID"]
+FEATURES_DB = os.environ["NOTION_FEATURES_DB_ID"]
 
 AGENT_SEQUENCE = [
     "spec-analyst",
@@ -46,38 +47,65 @@ AGENT_SEQUENCE = [
 # Notion helpers
 # ---------------------------------------------------------------------------
 
+def _rich_text(props: dict, key: str) -> str:
+    items = props.get(key, {}).get("rich_text", [])
+    return "".join(i["plain_text"] for i in items)
+
+
+def _title_text(props: dict) -> str:
+    items = props.get("Title", {}).get("title", [])
+    return "".join(i["plain_text"] for i in items)
+
+
+def _multi_select(props: dict, key: str) -> list[str]:
+    return [i["name"] for i in props.get(key, {}).get("multi_select", [])]
+
+
+def _url_field(props: dict, key: str) -> str:
+    return props.get(key, {}).get("url") or ""
+
+
+def _page_status(props: dict) -> str:
+    status_prop = props.get("Status", {})
+    return (
+        (status_prop.get("status") or {}).get("name") or
+        (status_prop.get("select") or {}).get("name") or
+        "Unknown"
+    )
+
+
 def load_spec(feature_id: str) -> dict:
     page = get_page(feature_id)
     props = page["properties"]
 
-    def rich_text(key: str) -> str:
-        items = props.get(key, {}).get("rich_text", [])
-        return "".join(i["plain_text"] for i in items)
+    description = _rich_text(props, "Description")
+    tech_notes = _rich_text(props, "Tech Notes")
 
-    def title_text() -> str:
-        items = props.get("Title", {}).get("title", [])
-        return "".join(i["plain_text"] for i in items)
-
-    def multi_select(key: str) -> list[str]:
-        return [i["name"] for i in props.get(key, {}).get("multi_select", [])]
-
-    def url_field(key: str) -> str:
-        return props.get(key, {}).get("url") or ""
-
-    description = rich_text("Description")
-    tech_notes = rich_text("Tech Notes")
+    # Fetch dependency context so orchestrator and agents can build on prior work
+    dep_relations = props.get("Depends On", {}).get("relation", [])
+    dependencies = []
+    for dep in dep_relations:
+        dep_page = get_page(dep["id"])
+        dp = dep_page["properties"]
+        dep_desc = _rich_text(dp, "Description") or _rich_text(dp, "Tech Notes")
+        dependencies.append({
+            "id": dep["id"],
+            "title": _title_text(dp),
+            "status": _page_status(dp),
+            "description": dep_desc,
+        })
 
     return {
         "feature_id": feature_id,
-        "title": title_text(),
-        # Description is now its own field; fall back to Tech Notes for old-style specs
+        "title": _title_text(props),
         "description": description or tech_notes,
         "tech_notes": tech_notes,
-        "acceptance_criteria": rich_text("Acceptance Criteria"),
-        "out_of_scope": rich_text("Out of Scope"),
-        "affected_roles": multi_select("Affected Roles"),
-        "design_url": url_field("Design URL"),
-        "feature_flag": rich_text("Feature Flag"),
+        "acceptance_criteria": _rich_text(props, "Acceptance Criteria"),
+        "out_of_scope": _rich_text(props, "Out of Scope"),
+        "affected_roles": _multi_select(props, "Affected Roles"),
+        "design_url": _url_field(props, "Design URL"),
+        "feature_flag": _rich_text(props, "Feature Flag"),
+        "dependencies": dependencies,
     }
 
 
@@ -102,6 +130,26 @@ def log_run(feature_id: str, agents_fired: list, outcome: str, duration: float, 
             "Started": {"date": {"start": datetime.now(timezone.utc).isoformat()}},
         },
     )
+
+
+def get_unblocked_queued_features() -> list[str]:
+    """Returns IDs of Queued features whose dependencies are all Done."""
+    queued_pages = query_database(FEATURES_DB, filter_obj={
+        "property": "Status",
+        "select": {"equals": "Queued"},
+    })
+    unblocked = []
+    for page in queued_pages:
+        deps = page["properties"].get("Depends On", {}).get("relation", [])
+        if not deps:
+            continue
+        all_done = all(
+            _page_status(get_page(dep["id"])["properties"]) == "Done"
+            for dep in deps
+        )
+        if all_done:
+            unblocked.append(page["id"])
+    return unblocked
 
 
 # ---------------------------------------------------------------------------
@@ -154,8 +202,6 @@ def cmd_build(feature_id: str) -> None:
                 if reqs_path.exists():
                     reqs = json.loads(reqs_path.read_text())
                     if reqs.get("blockers"):
-                        # Only hard blockers halt the build — things like "no idea what to build".
-                        # Assumption-level questions are logged as warnings and the build continues.
                         hard = [b for b in reqs["blockers"] if b.upper().startswith("HARD:")]
                         soft = [b for b in reqs["blockers"] if not b.upper().startswith("HARD:")]
                         if soft:
@@ -192,12 +238,21 @@ def cmd_build(feature_id: str) -> None:
         error_msg = str(exc)
         duration = time.time() - start
         print(f"Build FAILED: {error_msg}", file=sys.stderr)
-        log_run(feature_id, agents_fired, "Failed", duration, error=error_msg)
-        set_status(feature_id, "Failed", {
-            "Error Log": {"rich_text": [{"text": {"content": error_msg[:2000]}}]},
-        })
+        try:
+            log_run(feature_id, agents_fired, "Failed", duration, error=error_msg)
+        except Exception as e2:
+            print(f"WARNING: log_run failed: {e2}", file=sys.stderr)
+        try:
+            set_status(feature_id, "Failed", {
+                "Error Log": {"rich_text": [{"text": {"content": error_msg[:2000]}}]},
+            })
+        except Exception as e2:
+            print(f"WARNING: set_status failed: {e2}", file=sys.stderr)
         if branch_name:
-            delete_remote_branch(branch_name)
+            try:
+                delete_remote_branch(branch_name)
+            except Exception as e2:
+                print(f"WARNING: delete_remote_branch failed: {e2}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -231,14 +286,32 @@ def cmd_merge(feature_id: str) -> None:
         set_status(feature_id, "Done", {"PR Link": {"url": pr_url}})
         print(f"Factory run complete in {duration:.1f}s. PR: {pr_url}")
 
+        # Auto-trigger any Queued features that are now unblocked
+        try:
+            unblocked = get_unblocked_queued_features()
+            for unblocked_id in unblocked:
+                print(f"Auto-triggering newly unblocked feature: {unblocked_id}")
+                trigger_repository_dispatch(unblocked_id)
+        except Exception as e:
+            print(f"WARNING: auto-trigger check failed: {e}", file=sys.stderr)
+
     except Exception as exc:
         error_msg = str(exc)
         print(f"Merge FAILED: {error_msg}", file=sys.stderr)
-        log_run(feature_id, agents_fired, "Failed", duration, error=error_msg)
-        set_status(feature_id, "Failed", {
-            "Error Log": {"rich_text": [{"text": {"content": error_msg[:2000]}}]},
-        })
-        delete_remote_branch(branch_name)
+        try:
+            log_run(feature_id, agents_fired, "Failed", duration, error=error_msg)
+        except Exception as e2:
+            print(f"WARNING: log_run failed: {e2}", file=sys.stderr)
+        try:
+            set_status(feature_id, "Failed", {
+                "Error Log": {"rich_text": [{"text": {"content": error_msg[:2000]}}]},
+            })
+        except Exception as e2:
+            print(f"WARNING: set_status failed: {e2}", file=sys.stderr)
+        try:
+            delete_remote_branch(branch_name)
+        except Exception as e2:
+            print(f"WARNING: delete_remote_branch failed: {e2}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -259,10 +332,16 @@ def cmd_fail(feature_id: str, error_msg: str) -> None:
         start = state.get("start_time", start)
 
     duration = time.time() - start
-    log_run(feature_id, agents_fired, "Failed", duration, error=error_msg)
-    set_status(feature_id, "Failed", {
-        "Error Log": {"rich_text": [{"text": {"content": error_msg[:2000]}}]},
-    })
+    try:
+        log_run(feature_id, agents_fired, "Failed", duration, error=error_msg)
+    except Exception as e:
+        print(f"WARNING: log_run failed: {e}", file=sys.stderr)
+    try:
+        set_status(feature_id, "Failed", {
+            "Error Log": {"rich_text": [{"text": {"content": error_msg[:2000]}}]},
+        })
+    except Exception as e:
+        print(f"WARNING: set_status failed: {e}", file=sys.stderr)
     if branch_name:
         delete_remote_branch(branch_name)
     print(f"Marked {feature_id} as Failed: {error_msg}")

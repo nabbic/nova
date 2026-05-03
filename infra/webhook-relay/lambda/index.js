@@ -5,6 +5,7 @@ const GITHUB_REPO = process.env.GITHUB_REPO;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const TARGET_STATUS = "Ready to Build";
+const NOTION_VERSION = "2022-06-28";
 
 exports.handler = async (event) => {
   try {
@@ -36,13 +37,36 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: "No page ID in webhook payload" }) };
     }
 
-    // Fetch the page to confirm Status is still "Ready to Build"
-    // (user may have changed it again before we processed the event)
-    const status = await getPageStatus(featureId);
+    // Fetch the full page to confirm status and read dependencies
+    const page = await fetchPage(featureId);
+    const props = page.properties || {};
+    const status = extractStatus(props);
     console.log(`Page ${featureId} status: "${status}"`);
 
     if (status !== TARGET_STATUS) {
       return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: `status is "${status}"` }) };
+    }
+
+    // Check that all dependencies are Done before dispatching
+    const depIds = extractDepIds(props);
+    if (depIds.length > 0) {
+      const pendingDeps = [];
+      for (const depId of depIds) {
+        const depPage = await fetchPage(depId);
+        const depStatus = extractStatus(depPage.properties || {});
+        if (depStatus !== "Done") {
+          pendingDeps.push({ id: depId, status: depStatus });
+        }
+      }
+
+      if (pendingDeps.length > 0) {
+        console.log(`Feature ${featureId} has ${pendingDeps.length} unfinished dep(s) — setting Queued`, pendingDeps);
+        await setPageStatus(featureId, "Queued");
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ queued: true, featureId, pendingDeps }),
+        };
+      }
     }
 
     await triggerGitHubActions(featureId);
@@ -55,38 +79,80 @@ exports.handler = async (event) => {
   }
 };
 
-function getPageStatus(pageId) {
+function extractStatus(props) {
+  return (
+    props?.Status?.status?.name ||
+    props?.Status?.select?.name ||
+    null
+  );
+}
+
+function extractDepIds(props) {
+  return (props?.["Depends On"]?.relation || []).map((r) => r.id);
+}
+
+function fetchPage(pageId) {
   return new Promise((resolve, reject) => {
-    const options = {
-      hostname: "api.notion.com",
-      path: `/v1/pages/${pageId}`,
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${NOTION_API_KEY}`,
-        "Notion-Version": "2022-06-28",
+    const req = https.request(
+      {
+        hostname: "api.notion.com",
+        path: `/v1/pages/${pageId}`,
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${NOTION_API_KEY}`,
+          "Notion-Version": NOTION_VERSION,
+        },
       },
-    };
-
-    const req = https.request(options, (res) => {
-      let data = "";
-      res.on("data", (chunk) => { data += chunk; });
-      res.on("end", () => {
-        try {
-          const page = JSON.parse(data);
-          // Notion "Status" properties are type "status", not "select"
-          // Support both in case the DB was set up either way
-          const status =
-            page?.properties?.Status?.status?.name ||
-            page?.properties?.Status?.select?.name ||
-            null;
-          resolve(status);
-        } catch (e) {
-          reject(new Error(`Failed to parse Notion response: ${e.message}`));
-        }
-      });
-    });
-
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; });
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(new Error(`Failed to parse Notion page response: ${e.message}`));
+          }
+        });
+      }
+    );
     req.on("error", reject);
+    req.end();
+  });
+}
+
+function setPageStatus(pageId, statusName) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({
+      properties: {
+        Status: { select: { name: statusName } },
+      },
+    });
+    const req = https.request(
+      {
+        hostname: "api.notion.com",
+        path: `/v1/pages/${pageId}`,
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${NOTION_API_KEY}`,
+          "Notion-Version": NOTION_VERSION,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; });
+        res.on("end", () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Notion PATCH returned ${res.statusCode}: ${data}`));
+          }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(payload);
     req.end();
   });
 }
@@ -98,30 +164,31 @@ function triggerGitHubActions(featureId) {
       client_payload: { feature_id: featureId },
     });
 
-    const options = {
-      hostname: "api.github.com",
-      path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/dispatches`,
-      method: "POST",
-      headers: {
-        "User-Agent": "nova-webhook-relay",
-        Authorization: `Bearer ${GITHUB_TOKEN}`,
-        Accept: "application/vnd.github.v3+json",
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(payload),
+    const req = https.request(
+      {
+        hostname: "api.github.com",
+        path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/dispatches`,
+        method: "POST",
+        headers: {
+          "User-Agent": "nova-webhook-relay",
+          Authorization: `Bearer ${GITHUB_TOKEN}`,
+          Accept: "application/vnd.github.v3+json",
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(payload),
+        },
       },
-    };
-
-    const req = https.request(options, (res) => {
-      if (res.statusCode === 204) {
-        resolve();
-      } else {
-        let data = "";
-        res.on("data", (chunk) => { data += chunk; });
-        res.on("end", () => {
-          reject(new Error(`GitHub API returned ${res.statusCode}: ${data}`));
-        });
+      (res) => {
+        if (res.statusCode === 204) {
+          resolve();
+        } else {
+          let data = "";
+          res.on("data", (chunk) => { data += chunk; });
+          res.on("end", () => {
+            reject(new Error(`GitHub API returned ${res.statusCode}: ${data}`));
+          });
+        }
       }
-    });
+    );
 
     req.on("error", reject);
     req.write(payload);
