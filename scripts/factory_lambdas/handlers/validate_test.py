@@ -39,7 +39,11 @@ def handler(event, _ctx):
 
         tests_dir = ws / "tests"
         if tests_dir.exists():
-            pythonpath = _PKGS + ":" + str(ws) + ":" + os.environ.get("PYTHONPATH", "")
+            # Include Lambda layer path (/opt/python) explicitly — the runtime
+            # adds it to sys.path but not necessarily to the PYTHONPATH env var
+            pythonpath = ":".join(filter(None, [
+                _PKGS, str(ws), "/opt/python", os.environ.get("PYTHONPATH", ""),
+            ]))
             rc, out = _run(
                 ["python", "-m", "pytest", "--collect-only", "-q", "tests/"],
                 ws,
