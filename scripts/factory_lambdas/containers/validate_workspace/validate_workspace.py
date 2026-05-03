@@ -101,7 +101,9 @@ def handler(event, _ctx):
                     add("backend", "ruff", out)
 
                 rc, out = _run(
-                    ["python", "-m", "mypy", "app/", "--ignore-missing-imports"],
+                    ["python", "-m", "mypy", "app/",
+                     "--ignore-missing-imports",
+                     "--explicit-package-bases"],
                     ws, {"PYTHONPATH": pp},
                 )
                 if rc != 0:
