@@ -268,11 +268,15 @@ import annotations` handles the rest. Never use `TYPE_CHECKING` guards for relat
 
 ## Alembic env.py — Hard Rule
 
-Use this exact pattern for `app/db/migrations/env.py`. Do NOT add type annotations
-to `config` — mypy will reject `alembic.context.config` as a type alias:
+Use EXACTLY this pattern for `app/db/migrations/env.py`. Do NOT deviate:
 
 ```python
+from __future__ import annotations
+
+import asyncio
+import os
 from logging.config import fileConfig
+
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
@@ -282,11 +286,50 @@ config = context.config  # do NOT annotate this line
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import all models so autogenerate can detect them
 from app.models import Base  # noqa: E402
 
 target_metadata = Base.metadata
+
+
+def run_migrations_offline() -> None:
+    url = os.environ.get("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_migrations_online() -> None:
+    cfg = config.get_section(config.config_ini_section, {})
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        cfg["sqlalchemy.url"] = db_url
+    connectable = async_engine_from_config(cfg, prefix="sqlalchemy.", poolclass=pool.NullPool)
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+    await connectable.dispose()
+
+
+def do_run_migrations(connection) -> None:  # type: ignore[type-arg]
+    context.configure(connection=connection, target_metadata=target_metadata)
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    asyncio.run(run_migrations_online())
 ```
+
+**Critical rules:**
+- Do NOT annotate `config = context.config` — mypy rejects it
+- Do NOT wrap the offline/online dispatch in a `main()` function called from module level — alembic executes env.py directly; a `main()` function that calls `context.config` before alembic sets it up will crash on standalone import
+- Do NOT add extra imports (`asyncio` is already at the top level — do not re-import inside functions)
 
 ## Constraints
 - All buyer-scoped DB queries must include `buyer_org_id` filter — no exceptions
@@ -301,7 +344,15 @@ target_metadata = Base.metadata
   - Keep lines under 88 characters
 - Follow 12-factor: stateless, no local disk writes
 - **Remove every unused import before submitting.** `ruff check` runs without `--fix`;
-  any `F401` (unused import) or `F821` (undefined name) will fail validation.
-  Before finalising each file, mentally scan imports and remove any that are not
-  referenced in the file body.
+  any `F401` (unused import), `F821` (undefined name), or `F841` (variable assigned
+  but never used) will fail validation. Before finalising each file, mentally scan
+  imports and local variables; remove anything not referenced in the body.
+- When writing `_decode_token` / JWT helpers, do NOT create a local `options` variable
+  that you never pass to `jwt.decode`. Pass the options dict inline:
+  ```python
+  claims = jwt.decode(token, public_key, algorithms=["RS256"], options={"verify_aud": False})
+  ```
+- `app/db/migrations/env.py` is executed by Alembic, not imported by the app.
+  It MUST follow the exact Alembic env.py — Hard Rule pattern above. Do NOT add
+  any extra top-level logic beyond what the rule shows.
 - Respond with ONLY the JSON object — nothing else

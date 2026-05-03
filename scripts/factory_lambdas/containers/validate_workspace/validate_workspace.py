@@ -113,7 +113,8 @@ def handler(event, _ctx):
                     ["python", "-c",
                      "import importlib, pkgutil; "
                      "[importlib.import_module(n) for _,n,_ in "
-                     "pkgutil.walk_packages(['app'], prefix='app.')]"],
+                     "pkgutil.walk_packages(['app'], prefix='app.') "
+                     "if not n.startswith('app.db.migrations')]"],
                     ws, {"PYTHONPATH": pp},
                 )
                 if rc != 0:
