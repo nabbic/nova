@@ -9,6 +9,7 @@ __pycache__/
 *.tfstate
 *.tfstate.backup
 *.tfplan
+.outputs.json
 
 # Node
 node_modules/
