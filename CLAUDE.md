@@ -53,6 +53,44 @@ Never manually edit files that agents own unless you update this doc to reflect 
 - S3 state bucket: `nova-terraform-state-<account-id>` (created by infra bootstrap)
 - DynamoDB lock table: `nova-terraform-locks`
 
+## Container Strategy — Hard Requirement
+**Every service is containerized. The factory produces container images; ECS Fargate runs them.**
+
+### Images
+| Image | Purpose | CMD |
+|---|---|---|
+| `nova-api` | FastAPI app | `uvicorn app.main:app --host 0.0.0.0 --port 8000` |
+| `nova-worker` | SQS scan-job consumer | `python -m app.workers.main` |
+
+Both images are built from the **same `Dockerfile`** at the repo root.
+Worker uses a different `command` override in the ECS task definition.
+
+### Registry
+- ECR repository per image: `nova-api`, `nova-worker`
+- Registry: `{aws_account_id}.dkr.ecr.us-east-1.amazonaws.com`
+- Tags: `{git_sha_short}` (immutable) + `latest` (mutable, always points to newest)
+- Infra variable: `var.api_image` — ECS task definitions reference this
+
+### Dockerfile — Hard Requirement (Backend Agent)
+Every feature that touches `app/` MUST include or update:
+1. `Dockerfile` — multi-stage build at repo root:
+   - Stage `builder`: `python:3.12-slim`, install deps from `requirements.txt`
+   - Stage `runtime`: `python:3.12-slim`, copy deps + `app/`, run as non-root user
+2. `.dockerignore` — exclude `.git`, `tests/`, `infra/`, `frontend/`, `.env`, `__pycache__`
+3. `/health` endpoint in `app/main.py` — returns `{"status": "ok"}`, no auth, no DB
+4. `docker-compose.yml` at repo root — local dev: API + PostgreSQL container
+
+### Local Development
+`docker-compose.yml` at repo root provides the local dev environment:
+- `api` service: builds from `Dockerfile`, port 8000
+- `db` service: `postgres:16-alpine`, port 5432, health-checked
+- All env vars provided via `environment:` block (12-factor)
+- No `.env` file mounting — explicit vars only
+
+### Image Tagging in CI/CD
+- Factory build phase: validates `Dockerfile` builds (`docker build -t nova-api:test .`)
+- Deploy workflow: builds image → tags `{sha}` + `latest` → pushes to ECR → applies Terraform → ECS force-redeploys
+
 ## Fixed Baseline Stack
 | Layer | Choice |
 |---|---|
@@ -63,6 +101,8 @@ Never manually edit files that agents own unless you update this doc to reflect 
 | IaC | Terraform |
 | Backend | FastAPI (Python) |
 | Frontend | React 18 + TypeScript |
+| Container runtime | Docker (ECS Fargate) |
+| Container registry | Amazon ECR |
 
 ## Extended Stack (Tech DD Platform additions)
 | Concern | Choice | Notes |

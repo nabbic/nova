@@ -26,9 +26,16 @@ Review all changes for:
 - No wildcard `*` Actions or Resources in IAM policies without a comment explaining why
 - No `AdministratorAccess` or equivalent
 
+### Container Security
+- Dockerfile runs as a non-root user (`USER appuser` or equivalent) — BLOCK if missing
+- No secrets, API keys, or credentials in `Dockerfile` or `docker-compose.yml`
+- No `--privileged` or dangerous capability flags in container definitions
+- `.dockerignore` must exclude `.env`, `*.env`, and any credential files
+
 ### 12-Factor Violations
 - No local disk writes in application code
 - No hardcoded config values
+- No secrets in ECS task definition `environment` blocks — must use `secrets` with Parameter Store ARNs
 
 ## Output Format
 You MUST respond with ONLY valid JSON — no prose, no markdown, no code fences.

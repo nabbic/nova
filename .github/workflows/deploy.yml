@@ -7,12 +7,82 @@ env:
   TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
   TF_LOCK_TABLE: nova-terraform-locks
   AWS_REGION: us-east-1
+  ECR_API_REPO: nova-api
+  ECR_WORKER_REPO: nova-worker
 
 jobs:
+  # ── Build & push container images ─────────────────────────────────────────
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only run if a Dockerfile exists — skip gracefully during early infra-only phases
+    outputs:
+      api_image: ${{ steps.push.outputs.api_image }}
+      skip: ${{ steps.check.outputs.skip }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Dockerfile exists
+        id: check
+        run: |
+          if [ ! -f Dockerfile ]; then
+            echo "Dockerfile not yet present — skipping image build"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.check.outputs.skip != 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: steps.check.outputs.skip != 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push API image
+        if: steps.check.outputs.skip != 'true'
+        id: push
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          SHORT_SHA="${IMAGE_TAG::7}"
+          API_IMAGE="$ECR_REGISTRY/$ECR_API_REPO:$SHORT_SHA"
+
+          docker build \
+            --label "git.sha=$IMAGE_TAG" \
+            --label "build.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t "$API_IMAGE" \
+            -t "$ECR_REGISTRY/$ECR_API_REPO:latest" \
+            .
+
+          docker push "$API_IMAGE"
+          docker push "$ECR_REGISTRY/$ECR_API_REPO:latest"
+
+          # Worker uses the same image — just tag and push
+          docker tag "$API_IMAGE" "$ECR_REGISTRY/$ECR_WORKER_REPO:$SHORT_SHA"
+          docker tag "$API_IMAGE" "$ECR_REGISTRY/$ECR_WORKER_REPO:latest"
+          docker push "$ECR_REGISTRY/$ECR_WORKER_REPO:$SHORT_SHA"
+          docker push "$ECR_REGISTRY/$ECR_WORKER_REPO:latest"
+
+          echo "api_image=$API_IMAGE" >> $GITHUB_OUTPUT
+          echo "Pushed: $API_IMAGE"
+
+  # ── Deploy to Staging ──────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: build-and-push
     environment: staging
 
     steps:
@@ -23,11 +93,19 @@ jobs:
         id: infra_check
         run: |
           if [ ! -f infra/main.tf ]; then
-            echo "infra/main.tf not yet present (Plan 2 not complete) — skipping deploy"
+            echo "infra/main.tf not yet present — skipping Terraform deploy"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Configure AWS credentials
+        if: steps.infra_check.outputs.skip != 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
         if: steps.infra_check.outputs.skip != 'true'
@@ -38,9 +116,6 @@ jobs:
       - name: Terraform Init (staging)
         if: steps.infra_check.outputs.skip != 'true'
         working-directory: infra
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
@@ -52,27 +127,62 @@ jobs:
         if: steps.infra_check.outputs.skip != 'true'
         working-directory: infra
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TF_VAR_environment: staging
+          TF_VAR_api_image: ${{ needs.build-and-push.outputs.api_image }}
         run: terraform plan -out=tfplan-staging
 
       - name: Terraform Apply (staging)
         if: steps.infra_check.outputs.skip != 'true'
         working-directory: infra
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TF_VAR_environment: staging
+          TF_VAR_api_image: ${{ needs.build-and-push.outputs.api_image }}
         run: terraform apply tfplan-staging
 
+      # Force ECS to redeploy with the new image (task_definition is ignored_changes in TF)
+      - name: Force ECS redeployment (staging)
+        if: >
+          steps.infra_check.outputs.skip != 'true' &&
+          needs.build-and-push.outputs.skip != 'true'
+        run: |
+          CLUSTER="nova-staging"
+          SERVICE="nova-api-staging"
+          # Check if service exists before forcing redeploy
+          if aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+               --query 'services[0].status' --output text 2>/dev/null | grep -q ACTIVE; then
+            # Register new task definition with updated image
+            TASK_DEF=$(aws ecs describe-task-definition \
+              --task-definition "nova-api-staging" \
+              --query 'taskDefinition' --output json)
+            NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
+              --arg IMAGE "${{ needs.build-and-push.outputs.api_image }}" \
+              'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) |
+               .containerDefinitions[0].image = $IMAGE')
+            NEW_TASK_ARN=$(aws ecs register-task-definition \
+              --cli-input-json "$NEW_TASK_DEF" \
+              --query 'taskDefinition.taskDefinitionArn' --output text)
+            aws ecs update-service \
+              --cluster "$CLUSTER" \
+              --service "$SERVICE" \
+              --task-definition "$NEW_TASK_ARN" \
+              --force-new-deployment
+            # Wait for stable deployment
+            aws ecs wait services-stable \
+              --cluster "$CLUSTER" \
+              --services "$SERVICE"
+            echo "ECS staging deployment stable"
+          else
+            echo "ECS service not yet provisioned — skipping force-redeploy"
+          fi
+
+  # ── Deploy to Production ───────────────────────────────────────────────────
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: deploy-staging
+    needs: [build-and-push, deploy-staging]
     environment: production
 
     steps:
@@ -88,6 +198,14 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Configure AWS credentials
+        if: steps.infra_check.outputs.skip != 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Setup Terraform
         if: steps.infra_check.outputs.skip != 'true'
         uses: hashicorp/setup-terraform@v3
@@ -97,9 +215,6 @@ jobs:
       - name: Terraform Init (production)
         if: steps.infra_check.outputs.skip != 'true'
         working-directory: infra
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
@@ -111,18 +226,48 @@ jobs:
         if: steps.infra_check.outputs.skip != 'true'
         working-directory: infra
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TF_VAR_environment: production
+          TF_VAR_api_image: ${{ needs.build-and-push.outputs.api_image }}
         run: terraform plan -out=tfplan-production
 
       - name: Terraform Apply (production)
         if: steps.infra_check.outputs.skip != 'true'
         working-directory: infra
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TF_VAR_environment: production
+          TF_VAR_api_image: ${{ needs.build-and-push.outputs.api_image }}
         run: terraform apply tfplan-production
+
+      - name: Force ECS redeployment (production)
+        if: >
+          steps.infra_check.outputs.skip != 'true' &&
+          needs.build-and-push.outputs.skip != 'true'
+        run: |
+          CLUSTER="nova-production"
+          SERVICE="nova-api-production"
+          if aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+               --query 'services[0].status' --output text 2>/dev/null | grep -q ACTIVE; then
+            TASK_DEF=$(aws ecs describe-task-definition \
+              --task-definition "nova-api-production" \
+              --query 'taskDefinition' --output json)
+            NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
+              --arg IMAGE "${{ needs.build-and-push.outputs.api_image }}" \
+              'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) |
+               .containerDefinitions[0].image = $IMAGE')
+            NEW_TASK_ARN=$(aws ecs register-task-definition \
+              --cli-input-json "$NEW_TASK_DEF" \
+              --query 'taskDefinition.taskDefinitionArn' --output text)
+            aws ecs update-service \
+              --cluster "$CLUSTER" \
+              --service "$SERVICE" \
+              --task-definition "$NEW_TASK_ARN" \
+              --force-new-deployment
+            aws ecs wait services-stable \
+              --cluster "$CLUSTER" \
+              --services "$SERVICE"
+            echo "ECS production deployment stable"
+          else
+            echo "ECS service not yet provisioned — skipping force-redeploy"
+          fi

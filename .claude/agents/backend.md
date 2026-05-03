@@ -47,6 +47,107 @@ async def hello() -> HelloResponse:
 - Always include: `fastapi`, `uvicorn`, `pydantic`, `psycopg2-binary` (if DB used)
 - If `requirements.txt` already exists in the repo, extend it — do not replace it
 
+## Containerization — Hard Requirement
+**Every feature that touches `app/` MUST include these files in the file map.**
+
+### 1. `/health` endpoint
+`app/main.py` must always expose a `/health` route — no auth, no database call:
+```python
+@app.get("/health", include_in_schema=False)
+async def health() -> dict:
+    return {"status": "ok"}
+```
+ECS uses this for container health checks. Without it, ECS will cycle-kill the task.
+
+### 2. `Dockerfile` (multi-stage, at repo root)
+If `Dockerfile` does not already exist, create it:
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS builder
+WORKDIR /build
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+FROM python:3.12-slim AS runtime
+WORKDIR /app
+RUN adduser --disabled-password --gecos "" appuser
+COPY --from=builder /root/.local /home/appuser/.local
+COPY app/ ./app/
+RUN chown -R appuser:appuser /app
+USER appuser
+ENV PATH=/home/appuser/.local/bin:$PATH \
+    PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+```
+If `Dockerfile` already exists, keep it — only update if you're changing the CMD or adding a new stage.
+
+### 3. `.dockerignore` (at repo root)
+If it does not already exist, create it:
+```
+.git/
+.github/
+.factory-workspace/
+.superpowers/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+tests/
+infra/
+frontend/
+docs/
+scripts/
+*.md
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+```
+
+### 4. `docker-compose.yml` (at repo root)
+If it does not already exist, create it for local development:
+```yaml
+version: "3.9"
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nova:nova@db:5432/nova
+      COGNITO_BUYER_USER_POOL_ID: dummy-buyer-pool
+      COGNITO_SELLER_USER_POOL_ID: dummy-seller-pool
+      COGNITO_REGION: us-east-1
+      INVITATION_SECRET_KEY: local-dev-secret-min-32-chars-ok!!
+      ENVIRONMENT: development
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nova
+      POSTGRES_PASSWORD: nova
+      POSTGRES_DB: nova
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nova"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+```
+If `docker-compose.yml` already exists, update the `api.environment` block to include any new env vars this feature introduces.
+
 ## File Conventions
 Follow whatever pattern exists in `app/`. If `app/` is empty (first feature),
 establish this structure:
@@ -68,7 +169,7 @@ Your response must be a single JSON object where:
 - Keys are file paths relative to the repository root (e.g., `"app/api/routes/hello.py"`)
 - Values are the complete file contents as strings (use `\n` for newlines)
 
-Always include `"requirements.txt"` and `"docs/openapi.json"` in your file map.
+Always include `"requirements.txt"`, `"docs/openapi.json"`, `"Dockerfile"`, `".dockerignore"`, and `"docker-compose.yml"` in your file map. If these already exist and don't need changes, include them with their current contents — never omit them.
 
 ## Database Initialization — Hard Rule
 **Never raise errors or connect to the database at module import time.**
