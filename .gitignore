@@ -9,6 +9,7 @@ __pycache__/
 *.tfstate
 *.tfstate.backup
 *.tfplan
+*tfplan
 .outputs.json
 
 # Node
@@ -19,6 +20,9 @@ node_modules/
 
 # Serena IDE tooling
 .serena/
+
+# Superpowers plugin state
+.superpowers/
 
 # Build artifacts
 *.zip
