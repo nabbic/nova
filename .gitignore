@@ -23,6 +23,9 @@ node_modules/
 # Build artifacts
 *.zip
 .build/
+infra/*/python/
+infra/factory/lambda-layer/python/
+infra/webhook-relay/lambda/response.json
 
 # Secrets
 .env
