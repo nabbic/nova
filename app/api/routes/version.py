@@ -14,11 +14,7 @@ router = APIRouter()
     responses={
         200: {
             "description": "Successful response with API version",
-            "content": {
-                "application/json": {
-                    "example": {"version": "2.0.0"}
-                }
-            },
+            "content": {"application/json": {"example": {"version": "2.0.0"}}},
         }
     },
 )
