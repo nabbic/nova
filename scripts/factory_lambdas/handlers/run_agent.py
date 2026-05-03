@@ -48,6 +48,9 @@ def handler(event, _ctx):
     execution_id   = event["execution_id"]
     feature_id     = event["feature_id"]
     repair_context = event.get("repair_context")
+    # Phase-level validation returns issues_by_owner dict; extract this agent's issues.
+    if isinstance(repair_context, dict) and agent_name in repair_context:
+        repair_context = repair_context[agent_name]
     model_override = event.get("model_override")
 
     plan = read_json(execution_id, "plan.json") if agent_name != "orchestrator" else None

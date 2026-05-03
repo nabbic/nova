@@ -11,11 +11,6 @@ locals {
     update_notion                = { timeout = 30,  memory = 256  }
     trigger_quality_gates        = { timeout = 30,  memory = 256  }
     handle_quality_gate_callback = { timeout = 30,  memory = 256  }
-    validate_backend             = { timeout = 300, memory = 2048, ephemeral = 2048 }
-    validate_frontend            = { timeout = 300, memory = 2048, ephemeral = 2048 }
-    validate_database            = { timeout = 120, memory = 1024, ephemeral = 1024 }
-    validate_infrastructure      = { timeout = 300, memory = 2048, ephemeral = 2048 }
-    validate_test                = { timeout = 300, memory = 2048, ephemeral = 2048 }
   }
 }
 
@@ -24,7 +19,7 @@ resource "null_resource" "build_handlers" {
     src_hash = sha256(join("", [
       for f in fileset("${path.module}/../../scripts/factory_lambdas", "**") :
       filemd5("${path.module}/../../scripts/factory_lambdas/${f}")
-      if !startswith(f, "dist/") && !startswith(f, "agent_prompts/")
+      if !startswith(f, "dist/") && !startswith(f, "agent_prompts/") && !startswith(f, "containers/")
     ]))
   }
   provisioner "local-exec" {

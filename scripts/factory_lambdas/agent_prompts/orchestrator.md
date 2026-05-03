@@ -27,11 +27,6 @@ Your entire response must be directly parseable by `json.loads()`.
   "summary": "One sentence describing what this feature does",
   "spec": "<embed the full feature spec JSON here>",
   "agents": ["spec-analyst", "architect", "database", "backend", "frontend", "infrastructure", "test", "security-reviewer"],
-  "parallel_groups": [
-    ["database"],
-    ["backend", "frontend", "infrastructure"],
-    ["test"]
-  ],
   "model_hint": {
     "backend": "sonnet",
     "security-reviewer": "opus"
@@ -39,7 +34,7 @@ Your entire response must be directly parseable by `json.loads()`.
   "notes": {
     "spec-analyst": "Specific guidance for this agent",
     "backend": "...",
-    "test": "...",
+    "test": "Cross-agent note: test agent runs AFTER backend/infrastructure complete. The workspace will have app/ and infra/ from those agents. Read those files before writing tests.",
     "security-reviewer": "..."
   },
   "skip_reason": {
@@ -55,12 +50,20 @@ downstream agents (especially spec-analyst) can read it from `plan.json`.
 The `agents` array lists only the agents that WILL run (not skipped ones).
 The `skip_reason` map explains why each skipped agent was omitted.
 
-### `parallel_groups` rules
-- Agents in the same inner array run concurrently; outer array entries run sequentially
-- `spec-analyst` and `architect` always run before `parallel_groups`
-- `security-reviewer` always runs last (never in `parallel_groups`)
-- You MUST always emit `parallel_groups` — never leave it empty or omit it
-- Only include agents that are in the `agents` array (not skipped ones)
+### Phase ordering — fixed by the state machine
+The state machine enforces fixed phase ordering:
+1. `database` (alone)
+2. `backend`, `frontend`, `infrastructure` (in parallel)
+3. `test` (alone, after all builders complete)
+4. `security-reviewer` (always last)
+
+You do NOT decide ordering. Just list which agents are needed via `agents` and `skip_reason`.
+Do NOT include a `parallel_groups` field — the state machine ignores it.
+
+Use `notes` to communicate cross-agent dependencies. For example:
+- Tell the `test` agent which modules `backend` will produce so it imports correctly.
+- Tell `frontend` that `backend` produces `docs/openapi.json` that it can use for typed API calls.
+- Tell `infrastructure` about any new env vars that `backend` requires.
 
 ### `model_hint` rules
 - Optional per-agent model override: `"haiku" | "sonnet" | "opus"`
