@@ -17,7 +17,15 @@ via cloud connectors and is guided through the process.
 
 ## Factory
 This repository is built and maintained by the Nova Software Factory — an autonomous
-multi-agent CI/CD pipeline. Features flow from Notion → GitHub Actions → AWS.
+multi-agent CI/CD pipeline.
+
+**Pipeline (as of 2026-05-03):** Notion → Webhook Lambda → Step Functions
+(`nova-factory-pipeline`) → per-agent Lambdas → S3 workspace → GitHub feature
+branch → `quality-gates.yml` → auto-merge → `deploy.yml`.
+
+The legacy `factory.yml` is deprecated (2026-05-03) and will be removed once the
+new pipeline has run cleanly for 30 days. Keep it as emergency fallback.
+
 Never manually edit files that agents own unless you update this doc to reflect it.
 
 ## Secrets Strategy — Hard Requirement
