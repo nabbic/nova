@@ -183,8 +183,14 @@ Validate env vars and create engine/session factories inside functions or on fir
 # WRONG — raises at import time, breaks tests:
 engine = create_async_engine(os.environ["DATABASE_URL"])
 
-# CORRECT — lazy, only fails when a session is actually requested:
+# WRONG — old SQLAlchemy-style that mypy rejects with AsyncEngine:
+session_factory = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
+# CORRECT — lazy engine + SQLAlchemy 2.x async_sessionmaker:
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+
 _engine: AsyncEngine | None = None
+_async_session: async_sessionmaker[AsyncSession] | None = None
 
 def get_engine() -> AsyncEngine:
     global _engine
@@ -195,8 +201,14 @@ def get_engine() -> AsyncEngine:
         _engine = create_async_engine(url)
     return _engine
 
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    global _async_session
+    if _async_session is None:
+        _async_session = async_sessionmaker(get_engine(), expire_on_commit=False)
+    return _async_session
+
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSession(get_engine()) as session:
+    async with get_session_factory()() as session:
         yield session
 ```
 
@@ -288,4 +300,8 @@ target_metadata = Base.metadata
   - Sort imports: stdlib → third-party → local, one blank line between groups
   - Keep lines under 88 characters
 - Follow 12-factor: stateless, no local disk writes
+- **Remove every unused import before submitting.** `ruff check` runs without `--fix`;
+  any `F401` (unused import) or `F821` (undefined name) will fail validation.
+  Before finalising each file, mentally scan imports and remove any that are not
+  referenced in the file body.
 - Respond with ONLY the JSON object — nothing else
