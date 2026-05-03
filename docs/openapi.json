@@ -1,31 +1,26 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Nova",
-    "description": "Nova multi-tenant SaaS API",
+    "title": "Nova API",
+    "description": "Nova Technical Due Diligence Platform API",
     "version": "0.1.0"
   },
   "paths": {
-    "/version": {
+    "/api/ping": {
       "get": {
         "tags": [
-          "meta"
+          "liveness"
         ],
-        "summary": "Get application version metadata",
-        "description": "Returns the current application version, build SHA, and deployment environment. All values are sourced from environment variables. No authentication required.",
-        "operationId": "get_version_version_get",
+        "summary": "Liveness probe",
+        "description": "Returns a pong response with the server's current UTC timestamp. No authentication required.",
+        "operationId": "ping_api_ping_get",
         "responses": {
           "200": {
-            "description": "Application version metadata",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VersionResponse"
-                },
-                "example": {
-                  "version": "1.2.3",
-                  "build_sha": "abc1234def5678",
-                  "environment": "staging"
+                  "$ref": "#/components/schemas/PingResponse"
                 }
               }
             }
@@ -36,34 +31,26 @@
   },
   "components": {
     "schemas": {
-      "VersionResponse": {
+      "PingResponse": {
         "type": "object",
-        "title": "VersionResponse",
-        "description": "Application version metadata response schema.",
+        "title": "PingResponse",
         "required": [
-          "version",
-          "build_sha",
-          "environment"
+          "pong",
+          "timestamp"
         ],
         "properties": {
-          "version": {
-            "type": "string",
-            "title": "Version",
-            "description": "Application version string, sourced from APP_VERSION env var. Defaults to 'unknown' if not set.",
-            "example": "1.2.3"
+          "pong": {
+            "type": "boolean",
+            "title": "Pong"
           },
-          "build_sha": {
+          "timestamp": {
             "type": "string",
-            "title": "Build Sha",
-            "description": "Git commit SHA of the current build, sourced from BUILD_SHA env var. Defaults to 'unknown' if not set.",
-            "example": "abc1234def5678"
-          },
-          "environment": {
-            "type": "string",
-            "title": "Environment",
-            "description": "Deployment environment name, sourced from ENVIRONMENT env var. Defaults to 'unknown' if not set.",
-            "example": "staging"
+            "title": "Timestamp"
           }
+        },
+        "example": {
+          "pong": true,
+          "timestamp": "2025-01-15T14:32:45.123456Z"
         }
       }
     }

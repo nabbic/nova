@@ -1,0 +1,6 @@
+# Test-only dependencies for the Nova test suite
+# Do NOT duplicate packages already pinned in app/requirements.txt
+
+pytest>=8.0,<10
+pytest-asyncio>=0.23,<1.0
+httpx>=0.27

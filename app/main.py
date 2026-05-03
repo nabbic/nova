@@ -1,11 +1,17 @@
 from fastapi import FastAPI
 
-from app.api.routes import version
+from app.api.routes.ping import router as ping_router
 
 app = FastAPI(
-    title="Nova",
-    description="Nova multi-tenant SaaS API",
+    title="Nova API",
+    description="Nova Technical Due Diligence Platform API",
     version="0.1.0",
 )
 
-app.include_router(version.router)
+
+@app.get("/health", include_in_schema=False)
+async def health() -> dict:
+    return {"status": "ok"}
+
+
+app.include_router(ping_router, prefix="/api")
