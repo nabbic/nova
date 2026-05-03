@@ -63,11 +63,15 @@ def load_spec(feature_id: str) -> dict:
     def url_field(key: str) -> str:
         return props.get(key, {}).get("url") or ""
 
+    description = rich_text("Description")
+    tech_notes = rich_text("Tech Notes")
+
     return {
         "feature_id": feature_id,
         "title": title_text(),
-        "description": rich_text("Description") or rich_text("Tech Notes"),
-        "tech_notes": rich_text("Tech Notes"),
+        # Description is now its own field; fall back to Tech Notes for old-style specs
+        "description": description or tech_notes,
+        "tech_notes": tech_notes,
         "acceptance_criteria": rich_text("Acceptance Criteria"),
         "out_of_scope": rich_text("Out of Scope"),
         "affected_roles": multi_select("Affected Roles"),
