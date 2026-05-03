@@ -7,7 +7,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-acquire-lock",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-acquire-lock",
         "Payload": {
           "feature_id.$": "$.feature_id",
           "execution_id.$": "$$.Execution.Name"
@@ -26,7 +26,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-update-notion",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-update-notion",
         "Payload": {
           "feature_id.$": "$.feature_id",
           "status": "In Progress"
@@ -40,7 +40,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-load-spec",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-load-spec",
         "Payload": {
           "feature_id.$": "$.feature_id",
           "execution_id.$": "$$.Execution.Name"
@@ -61,7 +61,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-run-orchestrator",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-orchestrator",
         "Payload": {
           "feature_id.$": "$.feature_id",
           "execution_id.$": "$$.Execution.Name"
@@ -77,7 +77,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-run-agent",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-agent",
         "Payload": {
           "agent_name": "spec-analyst",
           "feature_id.$": "$.feature_id",
@@ -94,7 +94,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-run-agent",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-agent",
         "Payload": {
           "agent_name": "architect",
           "feature_id.$": "$.feature_id",
@@ -138,7 +138,7 @@
                   "Type": "Task",
                   "Resource": "arn:aws:states:::lambda:invoke",
                   "Parameters": {
-                    "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-run-agent",
+                    "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-agent",
                     "Payload": {
                       "agent_name.$": "$.agent_name",
                       "execution_id.$": "$.execution_id",
@@ -166,7 +166,7 @@
                   "Type": "Task",
                   "Resource": "arn:aws:states:::lambda:invoke",
                   "Parameters": {
-                    "FunctionName.$": "States.Format('arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-validate-{}', $.agent_name)",
+                    "FunctionName.$": "States.Format('arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-validate-{}', $.agent_name)",
                     "Payload": {
                       "execution_id.$": "$.execution_id",
                       "feature_id.$":   "$.feature_id"
@@ -233,7 +233,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-run-agent",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-agent",
         "Payload": {
           "agent_name": "security-reviewer",
           "feature_id.$": "$.feature_id",
@@ -250,7 +250,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-evaluate-security",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-evaluate-security",
         "Payload": {
           "execution_id.$": "$$.Execution.Name",
           "feature_id.$": "$.feature_id"
@@ -291,7 +291,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-run-agent",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-agent",
         "Payload": {
           "agent_name": "backend",
           "feature_id.$": "$.feature_id",
@@ -308,7 +308,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-commit-and-push",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-commit-and-push",
         "Payload": {
           "feature_id.$": "$.feature_id",
           "execution_id.$": "$$.Execution.Name"
@@ -324,7 +324,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-trigger-quality-gates",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-trigger-quality-gates",
         "Payload": {
           "branch.$":     "$.commit.Payload.branch",
           "pr_number.$":  "$.commit.Payload.pr_number",
@@ -344,7 +344,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-update-notion",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-update-notion",
         "Payload": {
           "feature_id.$": "$.feature_id",
           "status": "Done",
@@ -359,7 +359,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-release-lock",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-release-lock",
         "Payload": {
           "feature_id.$":   "$.feature_id",
           "execution_id.$": "$$.Execution.Name"
@@ -373,7 +373,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-update-notion",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-update-notion",
         "Payload": {
           "feature_id.$": "$.feature_id",
           "status": "Failed",
@@ -388,7 +388,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-release-lock",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-release-lock",
         "Payload": {
           "feature_id.$":   "$.feature_id",
           "execution_id.$": "$$.Execution.Name"
@@ -402,7 +402,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:$${region}:$${account_id}:function:$${name_prefix}-update-notion",
+        "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-update-notion",
         "Payload": {
           "feature_id.$": "$.feature_id",
           "status": "Failed",
