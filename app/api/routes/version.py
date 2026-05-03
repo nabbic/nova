@@ -1,41 +1,27 @@
-import os
-
 from fastapi import APIRouter
 
-from app.models.version import VersionResponse
+from app.schemas.version import VersionV2Response
 
 router = APIRouter()
 
 
 @router.get(
-    "/version",
-    response_model=VersionResponse,
-    summary="Get application version metadata",
-    description=(
-        "Returns the current application version, build SHA, and deployment "
-        "environment. All values are sourced from environment variables. "
-        "No authentication required."
-    ),
+    "/version2",
+    response_model=VersionV2Response,
+    summary="Get API Version",
+    description="Returns the current API version. No authentication required.",
     tags=["meta"],
     responses={
         200: {
-            "description": "Application version metadata",
+            "description": "Successful response with API version",
             "content": {
                 "application/json": {
-                    "example": {
-                        "version": "1.2.3",
-                        "build_sha": "abc1234def5678",
-                        "environment": "staging",
-                    }
+                    "example": {"version": "2.0.0"}
                 }
             },
         }
     },
 )
-async def get_version() -> VersionResponse:
-    """Return application version metadata from environment variables."""
-    return VersionResponse(
-        version=os.environ.get("APP_VERSION", "unknown"),
-        build_sha=os.environ.get("BUILD_SHA", "unknown"),
-        environment=os.environ.get("ENVIRONMENT", "unknown"),
-    )
+async def get_version2() -> VersionV2Response:
+    """Return the current API version for smoke testing and factory validation."""
+    return VersionV2Response(version="2.0.0")
