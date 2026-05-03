@@ -64,3 +64,45 @@ def client():
 
 If you need async tests, use `httpx.AsyncClient` with `ASGITransport` and `@pytest.mark.asyncio`.
 Default to `TestClient` unless async is explicitly required.
+
+## tests/requirements.txt — Hard Rule
+**You MUST create or update `tests/requirements.txt`** in every run that adds new test
+dependencies. This file is the sole source of truth for the test environment.
+
+- List every package your test files import that is not already in the app's `requirements.txt`
+- Include version pins (e.g. `pytest>=8.0,<10`, `pytest-asyncio>=0.23`)
+- Do NOT duplicate packages already pinned in `requirements.txt` — check it first
+- The validate_workspace Lambda installs this file before running pytest; if a package is
+  missing here, the test collection will fail with an ImportError
+
+Example minimal `tests/requirements.txt`:
+```
+pytest>=8.0,<10
+pytest-asyncio>=0.23,<1.0
+httpx>=0.27
+```
+
+## Cross-Agent Dependencies — Read Order
+The test agent runs **after** backend, frontend, database, and infrastructure agents have
+all written their files. You can import and test anything they produced.
+
+However, **do not assume** file paths beyond what appears in the current workspace:
+- Backend writes to `app/` — check for `app/main.py`, `app/api/routes/`, `app/services/`
+- Database writes to `app/db/migrations/` and `app/models/`
+- Frontend writes to `frontend/src/`
+- Infrastructure writes to `infra/`
+
+If a file you need is absent (e.g. backend skipped a service), write the test anyway with
+a `pytest.importorskip` guard or a clear skip marker — do NOT fail silently.
+
+## Test Scope — What to Test and What to Skip
+**Test:**
+- Every new API route (happy path + 401 + wrong-tenant)
+- Every new service method that has branching logic
+- Every Alembic migration (schema round-trip: upgrade → downgrade → upgrade)
+- Every acceptance criterion in `requirements.json`
+
+**Skip (do not write tests for):**
+- Infrastructure Terraform files — validated separately by the workspace validator
+- Frontend component rendering — only test business-logic hooks and API client calls
+- Third-party library internals (Cognito, SQS, S3) — mock at the adapter boundary
