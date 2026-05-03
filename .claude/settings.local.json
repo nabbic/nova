@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(aws stepfunctions *)",
+      "Bash(aws lambda *)",
+      "Bash(aws logs *)",
+      "Bash(aws s3 *)",
+      "Bash(aws s3api *)",
+      "Bash(aws s3 cp *)",
+      "Bash(aws s3 ls *)",
+      "Bash(aws dynamodb *)",
+      "Bash(aws ssm *)",
+      "Bash(aws secretsmanager *)",
+      "Bash(aws cloudwatch *)",
+      "Bash(aws sts *)",
+      "Bash(aws ecr *)",
+      "Bash(aws events *)",
+      "Bash(aws iam get-* *)",
+      "Bash(aws iam list-* *)",
+      "Bash(terraform *)",
+      "Bash(docker build *)",
+      "Bash(docker push *)",
+      "Bash(docker tag *)",
+      "Bash(docker images *)",
+      "Bash(docker run *)",
+      "Bash(docker login *)",
+      "Bash(gh pr *)",
+      "Bash(gh run *)",
+      "Bash(gh workflow *)",
+      "Bash(gh release *)",
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(mypy *)",
+      "Bash(jq *)",
+      "Bash(wc *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(diff *)",
+      "Bash(sed *)"
+    ]
+  }
+}

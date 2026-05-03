@@ -16,17 +16,46 @@ via cloud connectors and is guided through the process.
   questionnaires, manage their data per-engagement
 
 ## Factory
-This repository is built and maintained by the Nova Software Factory — an autonomous
-multi-agent CI/CD pipeline.
+This repository is built and maintained by the **Nova Software Factory v2** —
+a deterministic Step Functions orchestrator that drives three LLM stages
+(Plan → Implement → Review) plus a deterministic Validate stage. The factory
+is described in detail in
+`docs/superpowers/specs/2026-05-03-factory-rebuild-design.md`.
 
-**Pipeline (as of 2026-05-03):** Notion → Webhook Lambda → Step Functions
-(`nova-factory-pipeline`) → per-agent Lambdas → S3 workspace → GitHub feature
-branch → `quality-gates.yml` → auto-merge → `deploy.yml`.
+**Pipeline (v2):**
+Notion → Webhook Lambda → Step Functions `nova-factory-v2` → Plan (Haiku)
+→ PlanGate → RalphLoop (≤ 6 turns of Sonnet, container Lambda) → Validate
+(deterministic ruff/mypy/pytest/tf/tsc) → Review (Sonnet) → CommitAndPush →
+OpenPR → quality-gates.yml → MarkDone. A separate state machine
+`nova-factory-postdeploy` probes staging after each merge and can revert.
 
-The legacy `factory.yml` is deprecated (2026-05-03) and will be removed once the
-new pipeline has run cleanly for 30 days. Keep it as emergency fallback.
+**Cutover status:** v2 is being built in parallel with v1. The webhook still
+routes to the legacy `nova-factory-pipeline` until Phase 6 of the rebuild
+flips `FACTORY_BACKEND="step-functions-v2"`. The legacy `factory.yml`
+GitHub Actions workflow remains as emergency fallback and is removed 30 days
+after stable v2 cutover.
 
-Never manually edit files that agents own unless you update this doc to reflect it.
+**Canonical factory artifacts** (committed to this repo):
+
+| Path | Purpose |
+|---|---|
+| `.factory/prd.schema.json`             | JSON Schema for the structured PRD emitted by Plan and consumed by every later stage. |
+| `.factory/feature-sizing-rubric.md`    | Deterministic sizing rubric Plan enforces — humans use it to self-size before filing. |
+| `.factory/implementer-system.md`       | System prompt RalphTurn concatenates with this CLAUDE.md when invoking `claude -p`. |
+| `.factory/reviewer-system.md`          | System prompt Review uses; encodes the four review categories and the JSON contract. |
+| `tests/factory/`                        | Unit tests for the schemas and (Phase 2+) the factory Lambdas. |
+
+**Sandbox boundaries:** RalphTurn writes only to its execution's S3 prefix
+and the Lambda-local `/tmp/ws`. Anything it tries to write under
+`.github/workflows/`, `.factory/` (except the `.factory/_DONE_` completion
+sentinel), `infra/factory/`, or any path containing `..` or absolute paths is
+DENIED at upload time and surfaced back as `DENIED:` lines in
+`repair_context.md` for the next turn. The factory's GitHub PAT is
+fine-grained, single-repo, `contents:write` + `pull_requests:write` only —
+no `workflow` scope, no admin.
+
+Never manually edit files that the factory owns unless you update this doc
+and the relevant `.factory/*` prompt to reflect it.
 
 ## Secrets Strategy — Hard Requirement
 All secrets follow a strict tiering. Violations will be caught by the Security Reviewer and block the build.
