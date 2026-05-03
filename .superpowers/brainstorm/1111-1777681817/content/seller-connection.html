@@ -1,0 +1,40 @@
+<h2>How does the seller connect?</h2>
+<p class="subtitle">This is the hardest UX and trust problem in the product. How do we get seller systems accessible?</p>
+
+<div class="options">
+  <div class="option" data-choice="agent" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Lightweight on-prem agent</h3>
+      <p>Seller installs a small agent inside their network. Agent runs locally, collects read-only data, and sends structured results to the platform. Nothing opens an inbound port — agent calls out.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Works for private networks, air-gapped, on-prem infra</li><li>Seller sees exactly what's collected</li><li>No credentials leave the network</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Requires seller IT involvement to install</li><li>Adds friction in a time-pressured process</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="cloud" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Cloud connectors (OAuth / API tokens)</h3>
+      <p>Seller authorises integrations via OAuth or read-only API tokens: GitHub, GitLab, AWS, GCP, Azure, Jira, PagerDuty, etc. Platform pulls data via their APIs. No agent required.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Low friction — one click per tool</li><li>Works perfectly for cloud-native SaaS</li><li>Standard auth patterns sellers recognise</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Doesn't reach on-prem or private network components</li><li>Dependent on what each API exposes</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid — cloud connectors + optional agent</h3>
+      <p>Cloud connectors handle the majority (GitHub, cloud infra, SaaS tooling). An on-prem agent is available for sellers with private network components, self-hosted tools, or on-prem databases.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Covers pure SaaS <em>and</em> hybrid/on-prem targets</li><li>Start with connectors, add agent only when needed</li><li>Matches the real diversity of target companies</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>More to build — two access paths to maintain</li><li>Connector library takes time to grow</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

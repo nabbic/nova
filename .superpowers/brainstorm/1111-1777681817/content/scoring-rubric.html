@@ -1,0 +1,91 @@
+<h2>Scoring Model &amp; Finding Detail</h2>
+<p class="subtitle">Every finding scored on two independent axes — then weighted into a deal-context score</p>
+
+<div style="font-family: system-ui; font-size: 13px;">
+
+  <!-- Two axes -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+    <div style="background: #1e293b; border-radius: 8px; padding: 14px 16px;">
+      <div style="color: #f87171; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Axis 1 — Financial Risk</div>
+      <div style="color: #94a3b8; font-size: 12px; line-height: 1.7; margin-bottom: 10px;">How much does this affect deal value, close probability, or post-close business continuity?</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div style="background: #dc26261a; border-left: 3px solid #dc2626; padding: 6px 10px; border-radius: 3px; color: #fca5a5; font-size: 11px;"><strong>Critical</strong> — Could block deal close or trigger MAC clause. Customer contract violations, active exploits, data breach exposure.</div>
+        <div style="background: #d977061a; border-left: 3px solid #d97706; padding: 6px 10px; border-radius: 3px; color: #fcd34d; font-size: 11px;"><strong>High</strong> — Likely valuation impact. Compliance gaps, architecture scalability ceiling, key person dependency.</div>
+        <div style="background: #0284c71a; border-left: 3px solid #0284c7; padding: 6px 10px; border-radius: 3px; color: #7dd3fc; font-size: 11px;"><strong>Medium</strong> — Operational cost post-close. Tech debt that slows velocity, missing monitoring, weak documentation.</div>
+        <div style="background: #1e293b; border-left: 3px solid #334155; padding: 6px 10px; border-radius: 3px; color: #64748b; font-size: 11px;"><strong>Low</strong> — Hygiene issues. No material financial impact but should be on the post-close backlog.</div>
+      </div>
+    </div>
+
+    <div style="background: #1e293b; border-radius: 8px; padding: 14px 16px;">
+      <div style="color: #a78bfa; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Axis 2 — Remediation Effort</div>
+      <div style="color: #94a3b8; font-size: 12px; line-height: 1.7; margin-bottom: 10px;">How much time, cost, and organisational lift is required to resolve this?</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div style="background: #15803d1a; border-left: 3px solid #15803d; padding: 6px 10px; border-radius: 3px; color: #86efac; font-size: 11px;"><strong>Days</strong> — A ticket. One engineer, no external dependency. Rotate keys, update a package, add a linter.</div>
+        <div style="background: #0284c71a; border-left: 3px solid #0284c7; padding: 6px 10px; border-radius: 3px; color: #7dd3fc; font-size: 11px;"><strong>Weeks</strong> — A sprint or two. Small team, some re-architecture or config work. Add IaC, set up alerting.</div>
+        <div style="background: #d977061a; border-left: 3px solid #d97706; padding: 6px 10px; border-radius: 3px; color: #fcd34d; font-size: 11px;"><strong>Months</strong> — A programme. Requires external consultants, vendor procurement, or process change. SOC 2, GDPR controls.</div>
+        <div style="background: #dc26261a; border-left: 3px solid #dc2626; padding: 6px 10px; border-radius: 3px; color: #fca5a5; font-size: 11px;"><strong>Years</strong> — Structural. Re-platforming, fundamental architectural shift, regulatory certification. Rare but deal-defining.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How findings roll up -->
+  <div style="background: #1e293b; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px;">
+    <div style="color: #60a5fa; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">How findings roll up to a category score</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 10px; text-align: center; font-size: 11px;">
+      <div style="background: #0f172a; padding: 8px; border-radius: 4px; color: #94a3b8;">Financial Risk<br><span style="color:#f87171; font-weight:bold;">60% weight</span></div>
+      <div style="background: #0f172a; padding: 8px; border-radius: 4px; color: #94a3b8;">Remediation Effort<br><span style="color:#a78bfa; font-weight:bold;">25% weight</span></div>
+      <div style="background: #0f172a; padding: 8px; border-radius: 4px; color: #94a3b8;">Finding Count<br><span style="color:#64748b; font-weight:bold;">10% weight</span></div>
+      <div style="background: #0f172a; padding: 8px; border-radius: 4px; color: #94a3b8;">Trend / Coverage<br><span style="color:#64748b; font-weight:bold;">5% weight</span></div>
+    </div>
+    <div style="color: #475569; font-size: 11px; text-align: center;">Category weights also vary — Security (25%) · Compliance (20%) · Infrastructure (15%) · Code Quality (15%) · Eng Process (12%) · Dependencies (8%) · Docs (5%)</div>
+  </div>
+
+  <!-- Example finding card - the new format -->
+  <div style="background: #1e293b; border-radius: 8px; padding: 14px 16px; margin-bottom: 8px;">
+    <div style="color: #94a3b8; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">Example finding — the new detail format</div>
+
+    <div style="background: #0f172a; border-radius: 8px; padding: 14px 16px; border-left: 4px solid #dc2626;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <div style="color: #f1f5f9; font-weight: bold; font-size: 13px;">No SOC 2 certification in place</div>
+        <div style="display: flex; gap: 6px;">
+          <span style="background: #dc26261a; color: #f87171; font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid #dc2626;">CRITICAL RISK</span>
+          <span style="background: #d977061a; color: #fcd34d; font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid #d97706;">MONTHS EFFORT</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 10px;">
+        <div style="color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px;">What this is</div>
+        <div style="color: #94a3b8; font-size: 12px; line-height: 1.6;">The company has no SOC 2 Type II certification and no evidence of an active audit programme. There are no formal security policies, access review processes, or vendor risk management procedures.</div>
+      </div>
+
+      <div style="margin-bottom: 10px;">
+        <div style="color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px;">Why this matters for the deal</div>
+        <div style="color: #cbd5e1; font-size: 12px; line-height: 1.6; background: #1e293b; padding: 8px 12px; border-radius: 4px;">Enterprise customers (typically 50%+ of ARR for SaaS at this stage) increasingly require SOC 2 as a contractual obligation. Without it, the company faces customer churn risk, blocked sales cycles, and cannot expand into regulated industries. This is a <strong style="color:#f87171;">valuation-relevant gap</strong> — acquirer should model the certification cost into the purchase price.</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+        <div>
+          <div style="color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px;">Estimated remediation</div>
+          <div style="color: #fcd34d; font-size: 12px; line-height: 1.6;">6–9 months · £80k–£150k<br><span style="color:#64748b;">(auditor fees, tooling, consultant time, internal resource)</span></div>
+        </div>
+        <div>
+          <div style="color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px;">Timing</div>
+          <div style="color: #fcd34d; font-size: 12px; line-height: 1.6;">Post-close programme<br><span style="color:#64748b;">(cannot be resolved pre-close — budget for earn-out or escrow)</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div style="color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px;">Recommended actions</div>
+        <div style="color: #94a3b8; font-size: 12px; line-height: 1.8;">
+          1. Engage a SOC 2 readiness consultant within 30 days of close<br>
+          2. Select an auditor and begin scoping<br>
+          3. Implement Vanta or Drata for continuous compliance monitoring<br>
+          4. Target Type I certification at 6 months, Type II at 12 months
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="color: #475569; font-size: 11px; text-align: center;">Every finding follows this format — automated by the AI synthesis layer, grounded in the scan data</div>
+
+</div>

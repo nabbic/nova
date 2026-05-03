@@ -1,0 +1,60 @@
+<h2>What does the product assess?</h2>
+<p class="subtitle">Select the categories that are core to v1. You can pick multiple.</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="code" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Code quality &amp; tech debt</h3>
+      <p>Complexity, duplication, test coverage, linting, dead code. Integrations: SonarQube, GitHub, GitLab, Bitbucket.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="security" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Security vulnerabilities</h3>
+      <p>SAST, dependency CVEs, secrets in code, OWASP findings, exposed endpoints. Integrations: Snyk, Semgrep, Trivy.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="infra" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Infrastructure &amp; architecture</h3>
+      <p>Cloud footprint, cost, scalability, redundancy, IaC coverage, single points of failure. Integrations: AWS/GCP/Azure APIs, Terraform state.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="process" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>Engineering process maturity</h3>
+      <p>DORA metrics, deployment frequency, incident history, PR review patterns, CI/CD pipeline health. Integrations: GitHub Actions, Jira, PagerDuty.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="deps" onclick="toggleSelect(this)">
+    <div class="letter">5</div>
+    <div class="content">
+      <h3>Dependencies &amp; licensing</h3>
+      <p>Open-source license risk, EOL packages, vendor lock-in, third-party API dependencies. Integrations: npm, pip, Maven, SBOM generation.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="compliance" onclick="toggleSelect(this)">
+    <div class="letter">6</div>
+    <div class="content">
+      <h3>Data &amp; compliance posture</h3>
+      <p>GDPR, SOC 2, HIPAA indicators, PII handling, audit log presence, data residency. Integrations: policy-as-code, cloud config scanners.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="docs" onclick="toggleSelect(this)">
+    <div class="letter">7</div>
+    <div class="content">
+      <h3>Documentation &amp; knowledge risk</h3>
+      <p>README quality, architecture docs, API docs, onboarding guides. Bus factor indicators — how much lives in one person's head.</p>
+    </div>
+  </div>
+</div>

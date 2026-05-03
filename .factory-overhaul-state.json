@@ -1,0 +1,11 @@
+{
+  "phase": "DONE_PENDING_SMOKE_TEST",
+  "completed": ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10"],
+  "last_action": "Phase 9 applied (dashboard, alarm, SNS, budget). Phase 10 docs written. P8 smoke test pending user action.",
+  "notes": [
+    "FACTORY_BACKEND=github-actions — do NOT flip to step-functions until smoke test passes",
+    "After smoke test passes: edit infra/webhook-relay/main.tf, set FACTORY_BACKEND=step-functions, terraform apply",
+    "SNS email subscription pending confirmation — check nabbic@gmail.com inbox",
+    "State machine ARN: arn:aws:states:us-east-1:577638385116:stateMachine:nova-factory-pipeline"
+  ]
+}

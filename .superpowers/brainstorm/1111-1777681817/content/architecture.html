@@ -1,0 +1,95 @@
+<h2>System Architecture</h2>
+<p class="subtitle">Four layers — engagement management, data collection, AI analysis, and reporting</p>
+
+<div style="font-family: monospace; font-size: 13px; line-height: 1.8; background: #0f1117; color: #e2e8f0; padding: 28px 32px; border-radius: 10px; margin-bottom: 24px;">
+
+<div style="color: #94a3b8; margin-bottom: 12px;">── BUYER (PE Firm) ──────────────────────────────── SELLER (Target Company) ──</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin-bottom: 2px;">
+  <div style="background: #1e3a5f; padding: 10px 14px; border-radius: 6px 0 0 6px;">
+    <span style="color: #60a5fa; font-weight: bold;">Buyer Portal</span><br>
+    <span style="color: #94a3b8; font-size: 11px;">Deal rooms · Live dashboard · Report viewer · Risk flags</span>
+  </div>
+  <div style="background: #1e3a5f; padding: 10px 14px; border-radius: 0 6px 6px 0; border-left: 1px solid #334155;">
+    <span style="color: #60a5fa; font-weight: bold;">Seller Portal</span><br>
+    <span style="color: #94a3b8; font-size: 11px;">Connect tools · Scope approval · See what's shared · Status</span>
+  </div>
+</div>
+
+<div style="text-align: center; color: #475569; margin: 4px 0;">↕ SaaS Web Frontend (single platform, role-based views)</div>
+
+<div style="background: #1e293b; padding: 10px 14px; border-radius: 6px; margin-bottom: 2px;">
+  <span style="color: #a78bfa; font-weight: bold;">Engagement Engine</span>
+  <span style="color: #64748b; font-size: 11px; margin-left: 12px;">Deal lifecycle · Invitations · Scope negotiation · Permissions · Status tracking</span>
+</div>
+
+<div style="text-align: center; color: #475569; margin: 4px 0;">↓</div>
+
+<div style="background: #1e293b; padding: 10px 14px; border-radius: 6px; margin-bottom: 2px;">
+  <span style="color: #34d399; font-weight: bold;">Agent Orchestrator</span>
+  <span style="color: #64748b; font-size: 11px; margin-left: 12px;">Schedules + sequences specialist agents · Handles failures · Writes findings to store</span>
+</div>
+
+<div style="text-align: center; color: #475569; margin: 4px 0;">↓ runs</div>
+
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-bottom: 2px;">
+  <div style="background: #14432a; padding: 8px 10px; border-radius: 6px; text-align: center;">
+    <div style="color: #4ade80; font-size: 11px; font-weight: bold;">Code Agent</div>
+    <div style="color: #64748b; font-size: 10px;">SonarQube · Git · SAST</div>
+  </div>
+  <div style="background: #14432a; padding: 8px 10px; border-radius: 6px; text-align: center;">
+    <div style="color: #4ade80; font-size: 11px; font-weight: bold;">Infra Agent</div>
+    <div style="color: #64748b; font-size: 10px;">AWS · GCP · Azure · IaC</div>
+  </div>
+  <div style="background: #14432a; padding: 8px 10px; border-radius: 6px; text-align: center;">
+    <div style="color: #4ade80; font-size: 11px; font-weight: bold;">Security Agent</div>
+    <div style="color: #64748b; font-size: 10px;">CVEs · Secrets · OWASP</div>
+  </div>
+  <div style="background: #14432a; padding: 8px 10px; border-radius: 6px; text-align: center;">
+    <div style="color: #4ade80; font-size: 11px; font-weight: bold;">Process Agent</div>
+    <div style="color: #64748b; font-size: 10px;">DORA · Jira · CI/CD</div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-bottom: 6px;">
+  <div style="background: #14432a; padding: 8px 10px; border-radius: 6px; text-align: center;">
+    <div style="color: #4ade80; font-size: 11px; font-weight: bold;">Deps Agent</div>
+    <div style="color: #64748b; font-size: 10px;">Licenses · EOL · SBOMs</div>
+  </div>
+  <div style="background: #14432a; padding: 8px 10px; border-radius: 6px; text-align: center;">
+    <div style="color: #4ade80; font-size: 11px; font-weight: bold;">Compliance Agent</div>
+    <div style="color: #64748b; font-size: 10px;">SOC2 · GDPR · Config</div>
+  </div>
+  <div style="background: #14432a; padding: 8px 10px; border-radius: 6px; text-align: center;">
+    <div style="color: #4ade80; font-size: 11px; font-weight: bold;">Docs Agent</div>
+    <div style="color: #64748b; font-size: 10px;">READMEs · API docs · Bus factor</div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin-bottom: 2px;">
+  <div style="background: #2d1b4e; padding: 8px 12px; border-radius: 6px;">
+    <span style="color: #c084fc; font-weight: bold; font-size: 11px;">Cloud Connectors</span>
+    <div style="color: #64748b; font-size: 10px;">GitHub · GitLab · AWS · GCP · Azure · Jira · PagerDuty · Snyk</div>
+  </div>
+  <div style="background: #2d1b4e; padding: 8px 12px; border-radius: 6px;">
+    <span style="color: #c084fc; font-weight: bold; font-size: 11px;">On-Prem Agent</span>
+    <div style="color: #64748b; font-size: 10px;">Installed in seller network · Outbound only · Self-hosted SonarQube · Private DBs</div>
+  </div>
+</div>
+
+<div style="text-align: center; color: #475569; margin: 4px 0;">↓ findings</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">
+  <div style="background: #1e293b; padding: 8px 12px; border-radius: 6px;">
+    <span style="color: #f59e0b; font-weight: bold; font-size: 11px;">Findings Store</span>
+    <div style="color: #64748b; font-size: 10px;">Structured per-category · Versioned per scan · Queryable</div>
+  </div>
+  <div style="background: #1e293b; padding: 8px 12px; border-radius: 6px;">
+    <span style="color: #f59e0b; font-weight: bold; font-size: 11px;">AI Synthesis Layer</span>
+    <div style="color: #64748b; font-size: 10px;">Generates exec summary · Risk scoring · Technical narrative · Report compilation</div>
+  </div>
+</div>
+
+</div>
+
+<p style="color: #64748b; font-size: 12px; text-align: center;">Does this architecture look right? Any layers missing or misplaced?</p>

@@ -1,0 +1,88 @@
+<h2>Buyer Report &amp; Dashboard</h2>
+<p class="subtitle">Two layers in one view — executive summary up top, technical drilldown below</p>
+
+<div style="font-family: system-ui; font-size: 13px;">
+
+  <!-- Header -->
+  <div style="background: #0f172a; border-radius: 10px; padding: 16px 20px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">Technical Diligence Report</div>
+      <div style="color: #f1f5f9; font-size: 18px; font-weight: bold; margin-top: 2px;">Acme SaaS Co. — Series B Acquisition</div>
+      <div style="color: #475569; font-size: 11px; margin-top: 2px;">Scan completed 2026-04-30 · 847 findings across 7 categories</div>
+    </div>
+    <div style="text-align: right;">
+      <div style="font-size: 36px; font-weight: bold; color: #f59e0b;">62</div>
+      <div style="color: #64748b; font-size: 11px;">Overall Risk Score</div>
+      <div style="background: #f59e0b22; color: #f59e0b; font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-top: 4px;">MEDIUM-HIGH RISK</div>
+    </div>
+  </div>
+
+  <!-- Executive Summary -->
+  <div style="background: #1e293b; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; border-left: 3px solid #f59e0b;">
+    <div style="color: #fbbf24; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Executive Summary</div>
+    <div style="color: #cbd5e1; font-size: 12px; line-height: 1.7;">
+      Acme SaaS Co. carries <strong style="color:#f87171;">significant security debt</strong> concentrated in unpatched third-party dependencies (47 critical CVEs) and a lack of secrets management hygiene. Infrastructure is well-architected on AWS but <strong style="color:#fbbf24;">cost-inefficient</strong> at scale. Code quality is <strong style="color:#86efac;">above average</strong> with strong test coverage. Engineering process is mature with a high deployment frequency. Primary risk for the acquirer is a 3–6 month remediation programme required before any SOC 2 audit.
+    </div>
+  </div>
+
+  <!-- Risk heatmap -->
+  <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 12px;">
+    <div style="background: #15803d22; border: 1px solid #15803d; border-radius: 6px; padding: 10px 6px; text-align: center; cursor: pointer;">
+      <div style="font-size: 18px; font-weight: bold; color: #4ade80;">82</div>
+      <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Code Quality</div>
+    </div>
+    <div style="background: #dc262622; border: 1px solid #dc2626; border-radius: 6px; padding: 10px 6px; text-align: center; cursor: pointer;">
+      <div style="font-size: 18px; font-weight: bold; color: #f87171;">31</div>
+      <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Security</div>
+    </div>
+    <div style="background: #d9770622; border: 1px solid #d97706; border-radius: 6px; padding: 10px 6px; text-align: center; cursor: pointer;">
+      <div style="font-size: 18px; font-weight: bold; color: #fbbf24;">65</div>
+      <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Infrastructure</div>
+    </div>
+    <div style="background: #15803d22; border: 1px solid #15803d; border-radius: 6px; padding: 10px 6px; text-align: center; cursor: pointer;">
+      <div style="font-size: 18px; font-weight: bold; color: #4ade80;">78</div>
+      <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Eng Process</div>
+    </div>
+    <div style="background: #d9770622; border: 1px solid #d97706; border-radius: 6px; padding: 10px 6px; text-align: center; cursor: pointer;">
+      <div style="font-size: 18px; font-weight: bold; color: #fbbf24;">59</div>
+      <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Dependencies</div>
+    </div>
+    <div style="background: #dc262622; border: 1px solid #dc2626; border-radius: 6px; padding: 10px 6px; text-align: center; cursor: pointer;">
+      <div style="font-size: 18px; font-weight: bold; color: #f87171;">38</div>
+      <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Compliance</div>
+    </div>
+    <div style="background: #d9770622; border: 1px solid #d97706; border-radius: 6px; padding: 10px 6px; text-align: center; cursor: pointer;">
+      <div style="font-size: 18px; font-weight: bold; color: #fbbf24;">61</div>
+      <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Docs &amp; Knowledge</div>
+    </div>
+  </div>
+
+  <!-- Critical flags -->
+  <div style="background: #1e293b; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px;">
+    <div style="color: #f87171; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">🚨 Critical Flags — Requires Immediate Attention</div>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="background: #dc26260f; border-left: 3px solid #dc2626; padding: 8px 12px; border-radius: 4px; color: #fca5a5; font-size: 12px;">47 critical CVEs in production dependencies — 12 with known active exploits (Log4j, OpenSSL)</div>
+      <div style="background: #dc26260f; border-left: 3px solid #dc2626; padding: 8px 12px; border-radius: 4px; color: #fca5a5; font-size: 12px;">API keys committed to git history (3 AWS keys, 1 Stripe key) — keys rotated but history not purged</div>
+      <div style="background: #dc26260f; border-left: 3px solid #dc2626; padding: 8px 12px; border-radius: 4px; color: #fca5a5; font-size: 12px;">No SOC 2 controls framework in place — significant gap for enterprise customer contractual obligations</div>
+    </div>
+  </div>
+
+  <!-- Section drilldown preview -->
+  <div style="background: #1e293b; border-radius: 8px; padding: 14px 18px;">
+    <div style="color: #94a3b8; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">Category Drilldown (click any score above to expand)</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+      <div style="background: #0f172a; border-radius: 6px; padding: 10px 12px;">
+        <div style="color: #f87171; font-size: 11px; font-weight: bold; margin-bottom: 4px;">Security — 31/100</div>
+        <div style="color: #64748b; font-size: 11px; line-height: 1.6;">47 critical CVEs · 3 secrets in git · No WAF · Overly permissive IAM roles · No pen test on record</div>
+        <div style="color: #475569; font-size: 10px; margin-top: 6px;">→ Full findings: 214 items · Estimated remediation: 90 days</div>
+      </div>
+      <div style="background: #0f172a; border-radius: 6px; padding: 10px 12px;">
+        <div style="color: #fbbf24; font-size: 11px; font-weight: bold; margin-bottom: 4px;">Infrastructure — 65/100</div>
+        <div style="color: #64748b; font-size: 11px; line-height: 1.6;">Well-architected on AWS · No IaC for 30% of resources · 3 single points of failure · Monthly cloud cost £42k</div>
+        <div style="color: #475569; font-size: 10px; margin-top: 6px;">→ Full findings: 89 items · Estimated remediation: 45 days</div>
+      </div>
+    </div>
+    <div style="color: #475569; font-size: 11px; text-align: center; margin-top: 10px;">+ Export as PDF · Share with advisors · Ask AI a question about this report</div>
+  </div>
+
+</div>
