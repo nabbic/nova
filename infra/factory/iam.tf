@@ -88,9 +88,9 @@ resource "aws_iam_role_policy" "sfn_permissions" {
       },
       {
         Effect   = "Allow"
-        Action   = ["logs:CreateLogDelivery", "logs:GetLogDelivery", "logs:UpdateLogDelivery",
-                   "logs:DeleteLogDelivery", "logs:ListLogDeliveries", "logs:PutResourcePolicy",
-                   "logs:DescribeResourcePolicies", "logs:DescribeLogGroups"]
+        Action   = ["logs:CreateLogDelivery", "logs:CreateLogGroup", "logs:GetLogDelivery",
+                   "logs:UpdateLogDelivery", "logs:DeleteLogDelivery", "logs:ListLogDeliveries",
+                   "logs:PutResourcePolicy", "logs:DescribeResourcePolicies", "logs:DescribeLogGroups"]
         Resource = "*"
       },
     ]
