@@ -9,9 +9,10 @@ resource "null_resource" "build_layer" {
 
 resource "aws_lambda_layer_version" "shared" {
   filename            = "${path.module}/lambda-layer/layer.zip"
-  # source_code_hash omitted intentionally: filebase64sha256 is evaluated at plan time
-  # before null_resource.build_layer has run, causing an "inconsistent result" error
-  # on first apply. Change detection is handled via null_resource triggers.
+  # source_code_hash uses the requirements.txt md5 (same value the build_layer
+  # null_resource triggers on). This avoids the filebase64sha256 plan-vs-apply
+  # race while still publishing a new layer version when deps change.
+  source_code_hash    = filemd5("${path.module}/lambda-layer/requirements.txt")
   layer_name          = "nova-factory-shared"
   compatible_runtimes = ["python3.12"]
   depends_on          = [null_resource.build_layer]

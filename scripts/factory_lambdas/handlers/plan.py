@@ -27,17 +27,21 @@ _s3 = boto3.client("s3")
 _FENCED = re.compile(r"```(?:json)?\s*(\{.*\})\s*```", re.DOTALL)
 
 # Schema lookup is robust across Lambda runtime + local test contexts
-_SCHEMA_PATH_CANDIDATES = [
-    Path(__file__).resolve().parent / ".factory" / "prd.schema.json",                     # Lambda runtime: /var/task/.factory/
-    Path(__file__).resolve().parents[3] / ".factory" / "prd.schema.json",                 # repo root from scripts/factory_lambdas/handlers/
-]
-_SCHEMA: dict | None = None
-for _p in _SCHEMA_PATH_CANDIDATES:
-    if _p.exists():
-        _SCHEMA = json.loads(_p.read_text(encoding="utf-8"))
-        break
-if _SCHEMA is None:
-    raise RuntimeError(f"prd.schema.json not found in any of: {_SCHEMA_PATH_CANDIDATES}")
+def _find_schema() -> dict:
+    here = Path(__file__).resolve()
+    candidates: list[Path] = [here.parent / ".factory" / "prd.schema.json"]  # Lambda /var/task/
+    # Walk up to look for repo-root .factory/ when running locally from tests
+    for ancestor in here.parents:
+        candidate = ancestor / ".factory" / "prd.schema.json"
+        if candidate not in candidates:
+            candidates.append(candidate)
+    for p in candidates:
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+    raise RuntimeError(f"prd.schema.json not found in any of: {candidates}")
+
+
+_SCHEMA = _find_schema()
 _VALIDATOR = Draft202012Validator(_SCHEMA)
 
 SYSTEM_PROMPT = """You are the Plan stage of the Nova Factory.
