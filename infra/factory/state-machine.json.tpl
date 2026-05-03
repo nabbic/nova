@@ -119,123 +119,278 @@
       "ResultPath": null,
       "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 10, "MaxAttempts": 2, "BackoffRate": 2.0}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "MarkFailedAndRelease"}],
-      "Next": "RunAgentGroupsMap"
+      "Next": "DatabasePhase"
     },
 
-    "RunAgentGroupsMap": {
+    "DatabasePhase": {
       "Type": "Map",
-      "ItemsPath": "$.orchestrator.Payload.plan.parallel_groups",
+      "ItemsPath": "$.orchestrator.Payload.plan.execution_phases.database",
       "MaxConcurrency": 1,
       "ItemSelector": {
-        "group.$": "$$.Map.Item.Value",
+        "agent_name.$":   "$$.Map.Item.Value",
         "execution_id.$": "$$.Execution.Name",
-        "feature_id.$": "$.feature_id"
+        "feature_id.$":   "$.feature_id",
+        "repair_count":   0,
+        "repair_context": null
       },
       "ItemProcessor": {
         "ProcessorConfig": {"Mode": "INLINE"},
-        "StartAt": "FanOut",
+        "StartAt": "DB_RunAgent",
         "States": {
-          "FanOut": {
-            "Type": "Map",
-            "ItemsPath": "$.group",
-            "MaxConcurrency": 5,
-            "ItemSelector": {
-              "agent_name.$": "$$.Map.Item.Value",
-              "execution_id.$": "$.execution_id",
-              "feature_id.$": "$.feature_id",
-              "repair_count": 0
-            },
-            "ItemProcessor": {
-              "ProcessorConfig": {"Mode": "INLINE"},
-              "StartAt": "RunOneAgent",
-              "States": {
-                "RunOneAgent": {
-                  "Type": "Task",
-                  "Resource": "arn:aws:states:::lambda:invoke",
-                  "Parameters": {
-                    "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-agent",
-                    "Payload": {
-                      "agent_name.$": "$.agent_name",
-                      "execution_id.$": "$.execution_id",
-                      "feature_id.$": "$.feature_id"
-                    }
-                  },
-                  "ResultPath": "$.agent_result",
-                  "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 15, "MaxAttempts": 2, "BackoffRate": 2.0}],
-                  "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.run_error", "Next": "AgentFailed"}],
-                  "Next": "ChooseValidator"
-                },
-                "ChooseValidator": {
-                  "Type": "Choice",
-                  "Choices": [
-                    {"Variable": "$.agent_name", "StringEquals": "backend",        "Next": "ValidateAgent"},
-                    {"Variable": "$.agent_name", "StringEquals": "frontend",       "Next": "ValidateAgent"},
-                    {"Variable": "$.agent_name", "StringEquals": "database",       "Next": "ValidateAgent"},
-                    {"Variable": "$.agent_name", "StringEquals": "infrastructure", "Next": "ValidateAgent"},
-                    {"Variable": "$.agent_name", "StringEquals": "test",           "Next": "ValidateAgent"}
-                  ],
-                  "Default": "AgentDone"
-                },
-                "ValidateAgent": {
-                  "Type": "Task",
-                  "Resource": "arn:aws:states:::lambda:invoke",
-                  "Parameters": {
-                    "FunctionName.$": "States.Format('arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-validate-{}', $.agent_name)",
-                    "Payload": {
-                      "execution_id.$": "$.execution_id",
-                      "feature_id.$":   "$.feature_id"
-                    }
-                  },
-                  "ResultPath": "$.validation",
-                  "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 10, "MaxAttempts": 2, "BackoffRate": 2.0}],
-                  "Next": "ValidationChoice"
-                },
-                "ValidationChoice": {
-                  "Type": "Choice",
-                  "Choices": [
-                    {
-                      "Variable": "$.validation.Payload.passed",
-                      "BooleanEquals": true,
-                      "Next": "AgentDone"
-                    },
-                    {
-                      "And": [
-                        {"Variable": "$.validation.Payload.passed", "BooleanEquals": false},
-                        {"Variable": "$.repair_count", "NumericLessThan": 2}
-                      ],
-                      "Next": "BumpRepairAndRetry"
-                    }
-                  ],
-                  "Default": "ValidationExhausted"
-                },
-                "BumpRepairAndRetry": {
-                  "Type": "Pass",
-                  "Parameters": {
-                    "agent_name.$":     "$.agent_name",
-                    "execution_id.$":   "$.execution_id",
-                    "feature_id.$":     "$.feature_id",
-                    "repair_context.$": "$.validation.Payload.issues",
-                    "repair_count.$":   "States.MathAdd($.repair_count, 1)"
-                  },
-                  "Next": "RunOneAgent"
-                },
-                "ValidationExhausted": {
-                  "Type": "Fail",
-                  "Error": "ValidationExhausted",
-                  "Cause": "Code agent could not produce passing output after 2 repair attempts"
-                },
-                "AgentFailed": {
-                  "Type": "Fail",
-                  "Error": "AgentFailed",
-                  "CausePath": "$.run_error.Cause"
-                },
-                "AgentDone": {
-                  "Type": "Succeed"
-                }
+          "DB_RunAgent": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-agent",
+              "Payload": {
+                "agent_name.$":     "$.agent_name",
+                "execution_id.$":   "$.execution_id",
+                "feature_id.$":     "$.feature_id",
+                "repair_context.$": "$.repair_context"
               }
             },
-            "End": true
-          }
+            "ResultPath": "$.agent_result",
+            "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 15, "MaxAttempts": 2, "BackoffRate": 2.0}],
+            "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.run_error", "Next": "DB_AgentFailed"}],
+            "Next": "DB_Validate"
+          },
+          "DB_Validate": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-validate-database",
+              "Payload": {
+                "execution_id.$": "$.execution_id",
+                "feature_id.$":   "$.feature_id"
+              }
+            },
+            "ResultPath": "$.validation",
+            "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 10, "MaxAttempts": 2, "BackoffRate": 2.0}],
+            "Next": "DB_ValidationChoice"
+          },
+          "DB_ValidationChoice": {
+            "Type": "Choice",
+            "Choices": [
+              {"Variable": "$.validation.Payload.passed", "BooleanEquals": true, "Next": "DB_Done"},
+              {
+                "And": [
+                  {"Variable": "$.validation.Payload.passed", "BooleanEquals": false},
+                  {"Variable": "$.repair_count", "NumericLessThan": 2}
+                ],
+                "Next": "DB_BumpRepair"
+              }
+            ],
+            "Default": "DB_Exhausted"
+          },
+          "DB_BumpRepair": {
+            "Type": "Pass",
+            "Parameters": {
+              "agent_name.$":     "$.agent_name",
+              "execution_id.$":   "$.execution_id",
+              "feature_id.$":     "$.feature_id",
+              "repair_context.$": "$.validation.Payload.issues",
+              "repair_count.$":   "States.MathAdd($.repair_count, 1)"
+            },
+            "Next": "DB_RunAgent"
+          },
+          "DB_Exhausted": {
+            "Type": "Fail",
+            "Error": "ValidationExhausted",
+            "Cause": "Database agent could not produce passing output after 2 repair attempts"
+          },
+          "DB_AgentFailed": {
+            "Type": "Fail",
+            "Error": "AgentFailed",
+            "CausePath": "$.run_error.Cause"
+          },
+          "DB_Done": {"Type": "Succeed"}
+        }
+      },
+      "ResultPath": null,
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "MarkFailedAndRelease"}],
+      "Next": "BuildersPhase"
+    },
+
+    "BuildersPhase": {
+      "Type": "Map",
+      "ItemsPath": "$.orchestrator.Payload.plan.execution_phases.builders",
+      "MaxConcurrency": 3,
+      "ItemSelector": {
+        "agent_name.$":   "$$.Map.Item.Value",
+        "execution_id.$": "$$.Execution.Name",
+        "feature_id.$":   "$.feature_id",
+        "repair_count":   0,
+        "repair_context": null
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": {"Mode": "INLINE"},
+        "StartAt": "BLD_RunAgent",
+        "States": {
+          "BLD_RunAgent": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-agent",
+              "Payload": {
+                "agent_name.$":     "$.agent_name",
+                "execution_id.$":   "$.execution_id",
+                "feature_id.$":     "$.feature_id",
+                "repair_context.$": "$.repair_context"
+              }
+            },
+            "ResultPath": "$.agent_result",
+            "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 15, "MaxAttempts": 2, "BackoffRate": 2.0}],
+            "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.run_error", "Next": "BLD_AgentFailed"}],
+            "Next": "BLD_ChooseValidator"
+          },
+          "BLD_ChooseValidator": {
+            "Type": "Choice",
+            "Choices": [
+              {"Variable": "$.agent_name", "StringEquals": "backend",        "Next": "BLD_Validate"},
+              {"Variable": "$.agent_name", "StringEquals": "frontend",       "Next": "BLD_Validate"},
+              {"Variable": "$.agent_name", "StringEquals": "infrastructure", "Next": "BLD_Validate"}
+            ],
+            "Default": "BLD_Done"
+          },
+          "BLD_Validate": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName.$": "States.Format('arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-validate-{}', $.agent_name)",
+              "Payload": {
+                "execution_id.$": "$.execution_id",
+                "feature_id.$":   "$.feature_id"
+              }
+            },
+            "ResultPath": "$.validation",
+            "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 10, "MaxAttempts": 2, "BackoffRate": 2.0}],
+            "Next": "BLD_ValidationChoice"
+          },
+          "BLD_ValidationChoice": {
+            "Type": "Choice",
+            "Choices": [
+              {"Variable": "$.validation.Payload.passed", "BooleanEquals": true, "Next": "BLD_Done"},
+              {
+                "And": [
+                  {"Variable": "$.validation.Payload.passed", "BooleanEquals": false},
+                  {"Variable": "$.repair_count", "NumericLessThan": 2}
+                ],
+                "Next": "BLD_BumpRepair"
+              }
+            ],
+            "Default": "BLD_Exhausted"
+          },
+          "BLD_BumpRepair": {
+            "Type": "Pass",
+            "Parameters": {
+              "agent_name.$":     "$.agent_name",
+              "execution_id.$":   "$.execution_id",
+              "feature_id.$":     "$.feature_id",
+              "repair_context.$": "$.validation.Payload.issues",
+              "repair_count.$":   "States.MathAdd($.repair_count, 1)"
+            },
+            "Next": "BLD_RunAgent"
+          },
+          "BLD_Exhausted": {
+            "Type": "Fail",
+            "Error": "ValidationExhausted",
+            "Cause": "Builder agent could not produce passing output after 2 repair attempts"
+          },
+          "BLD_AgentFailed": {
+            "Type": "Fail",
+            "Error": "AgentFailed",
+            "CausePath": "$.run_error.Cause"
+          },
+          "BLD_Done": {"Type": "Succeed"}
+        }
+      },
+      "ResultPath": null,
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "MarkFailedAndRelease"}],
+      "Next": "TestPhase"
+    },
+
+    "TestPhase": {
+      "Type": "Map",
+      "ItemsPath": "$.orchestrator.Payload.plan.execution_phases.test",
+      "MaxConcurrency": 1,
+      "ItemSelector": {
+        "agent_name.$":   "$$.Map.Item.Value",
+        "execution_id.$": "$$.Execution.Name",
+        "feature_id.$":   "$.feature_id",
+        "repair_count":   0,
+        "repair_context": null
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": {"Mode": "INLINE"},
+        "StartAt": "TST_RunAgent",
+        "States": {
+          "TST_RunAgent": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-run-agent",
+              "Payload": {
+                "agent_name.$":     "$.agent_name",
+                "execution_id.$":   "$.execution_id",
+                "feature_id.$":     "$.feature_id",
+                "repair_context.$": "$.repair_context"
+              }
+            },
+            "ResultPath": "$.agent_result",
+            "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 15, "MaxAttempts": 2, "BackoffRate": 2.0}],
+            "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.run_error", "Next": "TST_AgentFailed"}],
+            "Next": "TST_Validate"
+          },
+          "TST_Validate": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "arn:aws:lambda:${region}:${account_id}:function:${name_prefix}-validate-test",
+              "Payload": {
+                "execution_id.$": "$.execution_id",
+                "feature_id.$":   "$.feature_id"
+              }
+            },
+            "ResultPath": "$.validation",
+            "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 10, "MaxAttempts": 2, "BackoffRate": 2.0}],
+            "Next": "TST_ValidationChoice"
+          },
+          "TST_ValidationChoice": {
+            "Type": "Choice",
+            "Choices": [
+              {"Variable": "$.validation.Payload.passed", "BooleanEquals": true, "Next": "TST_Done"},
+              {
+                "And": [
+                  {"Variable": "$.validation.Payload.passed", "BooleanEquals": false},
+                  {"Variable": "$.repair_count", "NumericLessThan": 2}
+                ],
+                "Next": "TST_BumpRepair"
+              }
+            ],
+            "Default": "TST_Exhausted"
+          },
+          "TST_BumpRepair": {
+            "Type": "Pass",
+            "Parameters": {
+              "agent_name.$":     "$.agent_name",
+              "execution_id.$":   "$.execution_id",
+              "feature_id.$":     "$.feature_id",
+              "repair_context.$": "$.validation.Payload.issues",
+              "repair_count.$":   "States.MathAdd($.repair_count, 1)"
+            },
+            "Next": "TST_RunAgent"
+          },
+          "TST_Exhausted": {
+            "Type": "Fail",
+            "Error": "ValidationExhausted",
+            "Cause": "Test agent could not produce passing output after 2 repair attempts"
+          },
+          "TST_AgentFailed": {
+            "Type": "Fail",
+            "Error": "AgentFailed",
+            "CausePath": "$.run_error.Cause"
+          },
+          "TST_Done": {"Type": "Succeed"}
         }
       },
       "ResultPath": null,

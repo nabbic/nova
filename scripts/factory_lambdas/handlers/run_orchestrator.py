@@ -21,12 +21,14 @@ def handler(event, _ctx):
     try:
         result = call_agent_with_continuation("orchestrator", user_message)
         plan = parse_agent_json("orchestrator", result)
-        # Ensure parallel_groups covers all non-fixed agents
-        flat = [a for grp in plan.get("parallel_groups", []) for a in grp]
-        fixed = {"orchestrator", "spec-analyst", "architect", "security-reviewer"}
-        missing = set(plan.get("agents", [])) - set(flat) - fixed
-        if missing:
-            plan.setdefault("parallel_groups", []).append(sorted(missing))
+        # Compute execution_phases so the state machine can enforce fixed ordering.
+        # parallel_groups is kept for informational purposes only.
+        agents = plan.get("agents", [])
+        plan["execution_phases"] = {
+            "database": [a for a in agents if a == "database"],
+            "builders": [a for a in agents if a in {"backend", "frontend", "infrastructure"}],
+            "test":     [a for a in agents if a == "test"],
+        }
         write_json(execution_id, "plan.json", plan)
         record_step(execution_id, feature_id, "orchestrator", "success", time.time() - start)
         return {"status": "ok", "plan": plan}
