@@ -26,3 +26,9 @@ node_modules/
 # Secrets
 .env
 *.pem
+
+# Git worktrees
+.worktrees/
+
+# Factory overhaul state tracking
+.factory-overhaul-state.json
