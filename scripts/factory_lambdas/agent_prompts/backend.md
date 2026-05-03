@@ -240,6 +240,42 @@ Common failure patterns and the right repair:
 | `docker build: COPY failed: file not found` | Add the missing file or fix the COPY path |
 | `curl /health: Connection refused` | Check the CMD in Dockerfile; ensure /health exists |
 
+## SQLAlchemy Models — Hard Rules
+
+**Always add `from __future__ import annotations` as the first line of every model file.**
+This enables postponed evaluation of annotations and prevents `NameError`/mypy
+`name-defined` errors from forward references between models.
+
+```python
+from __future__ import annotations
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+```
+
+Relationships that reference other models use plain string class names — `from __future__
+import annotations` handles the rest. Never use `TYPE_CHECKING` guards for relationships.
+
+## Alembic env.py — Hard Rule
+
+Use this exact pattern for `app/db/migrations/env.py`. Do NOT add type annotations
+to `config` — mypy will reject `alembic.context.config` as a type alias:
+
+```python
+from logging.config import fileConfig
+from sqlalchemy import pool
+from sqlalchemy.ext.asyncio import async_engine_from_config
+from alembic import context
+
+config = context.config  # do NOT annotate this line
+
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+# Import all models so autogenerate can detect them
+from app.models import Base  # noqa: E402
+
+target_metadata = Base.metadata
+```
+
 ## Constraints
 - All buyer-scoped DB queries must include `buyer_org_id` filter — no exceptions
 - Seller-scoped queries must be scoped by `engagement_id`

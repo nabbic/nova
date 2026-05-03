@@ -185,7 +185,7 @@
           "Next": "SetDBRepaired"
         }
       ],
-      "Default": "MarkFailedAndRelease"
+      "Default": "InjectValidationError"
     },
 
     "SetDBRepaired": {
@@ -294,7 +294,7 @@
           "Next": "SetBLDRepaired"
         }
       ],
-      "Default": "MarkFailedAndRelease"
+      "Default": "InjectValidationError"
     },
 
     "SetBLDRepaired": {
@@ -403,7 +403,7 @@
           "Next": "SetTSTRepaired"
         }
       ],
-      "Default": "MarkFailedAndRelease"
+      "Default": "InjectValidationError"
     },
 
     "SetTSTRepaired": {
@@ -497,7 +497,7 @@
           "Next": "SetRepairAttempted"
         }
       ],
-      "Default": "MarkFailedAndRelease"
+      "Default": "InjectValidationError"
     },
 
     "SetRepairAttempted": {
@@ -587,6 +587,15 @@
       },
       "ResultPath": null,
       "End": true
+    },
+
+    "InjectValidationError": {
+      "Type": "Pass",
+      "Parameters": {
+        "feature_id.$": "$.feature_id",
+        "error": {"Error": "ValidationFailed", "Cause": "Workspace validation failed after repair cycle — check CloudWatch logs"}
+      },
+      "Next": "MarkFailedAndRelease"
     },
 
     "MarkFailedAndRelease": {
