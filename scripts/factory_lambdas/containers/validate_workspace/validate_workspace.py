@@ -96,6 +96,11 @@ def handler(event, _ctx):
 
         if phase in {"builders", "test"}:
             if (ws / "app").exists():
+                # Auto-fix safe ruff issues (mirrors quality-gates.yml behaviour)
+                _run(["python", "-m", "ruff", "format", "app/"], ws, {"PYTHONPATH": pp})
+                _run(["python", "-m", "ruff", "check", "--fix", "--unsafe-fixes", "app/"],
+                     ws, {"PYTHONPATH": pp})
+
                 rc, out = _run(["python", "-m", "ruff", "check", "app/"], ws, {"PYTHONPATH": pp})
                 if rc != 0:
                     add("backend", "ruff", out)

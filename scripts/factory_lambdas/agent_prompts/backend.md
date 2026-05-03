@@ -340,6 +340,7 @@ else:
   - Use `dict`, `list`, `tuple`, `set` — NOT `Dict`, `List`, `Tuple`, `Set` from `typing`
   - Use `X | None` — NOT `Optional[X]`
   - Use `X | Y` — NOT `Union[X, Y]`
+  - Use `enum.StrEnum` NOT `from strenum import StrEnum` — `StrEnum` is built-in from Python 3.11+
   - Sort imports: stdlib → third-party → local, one blank line between groups
   - Keep lines under 88 characters
 - Follow 12-factor: stateless, no local disk writes

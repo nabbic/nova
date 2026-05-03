@@ -13,7 +13,8 @@ RUN dnf install -y nodejs npm && \
     ln -sf /opt/node/lib/node_modules/typescript/bin/tsc /opt/bin/tsc
 
 # Python tooling pre-installed so warm containers skip pip install
-RUN pip install --no-cache-dir ruff mypy pytest pytest-asyncio httpx anyio alembic
+RUN pip install --no-cache-dir ruff mypy pytest pytest-asyncio httpx anyio alembic \
+    fastapi pydantic pydantic-settings sqlalchemy asyncpg python-jose[cryptography] strenum
 
 COPY tsc-runner.js /opt/node/tsc-runner.js
 COPY common/  ${LAMBDA_TASK_ROOT}/common/
