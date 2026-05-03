@@ -8,6 +8,7 @@ from common.workspace import list_code_files, read_code_file
 from common.runs import record_step
 
 _PKGS = "/tmp/test-pkgs"
+_PKGS_HASH = "/tmp/test-pkgs.hash"
 
 
 def _materialize(execution_id: str) -> Path:
@@ -17,6 +18,16 @@ def _materialize(execution_id: str) -> Path:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(read_code_file(execution_id, rel))
     return tmp
+
+
+def _req_hash(ws: Path) -> str:
+    import hashlib
+    parts = []
+    for name in ("requirements.txt", "tests/requirements.txt"):
+        f = ws / name
+        if f.exists():
+            parts.append(f.read_text())
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()
 
 
 def _run(cmd: list[str], cwd: Path, extra_env: dict | None = None) -> tuple[int, str]:
@@ -32,10 +43,18 @@ def handler(event, _ctx):
     ws = _materialize(execution_id)
     issues = []
     try:
-        req = ws / "requirements.txt"
-        if req.exists() and not Path(_PKGS).exists():
-            _run(["pip", "install", "-q", "-r", "requirements.txt",
-                  "--target", _PKGS, "--no-compile"], ws)
+        current_hash = _req_hash(ws)
+        cached_hash = Path(_PKGS_HASH).read_text() if Path(_PKGS_HASH).exists() else ""
+        if current_hash != cached_hash:
+            shutil.rmtree(_PKGS, ignore_errors=True)
+            reqs_to_install = []
+            for name in ("requirements.txt", "tests/requirements.txt"):
+                if (ws / name).exists():
+                    reqs_to_install.extend(["-r", name])
+            if reqs_to_install:
+                _run(["pip", "install", "-q"] + reqs_to_install +
+                     ["--target", _PKGS, "--no-compile"], ws)
+            Path(_PKGS_HASH).write_text(current_hash)
 
         tests_dir = ws / "tests"
         if tests_dir.exists():

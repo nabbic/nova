@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import tempfile
@@ -17,7 +18,10 @@ def _materialize(execution_id: str) -> Path:
 
 
 def _run(cmd: list[str], cwd: Path) -> tuple[int, str]:
-    p = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=60)
+    env = {**os.environ, "PYTHONPATH": ":".join(filter(None, [
+        "/opt/python", os.environ.get("PYTHONPATH", ""),
+    ]))}
+    p = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=60, env=env)
     return p.returncode, (p.stdout + p.stderr)[:8000]
 
 
