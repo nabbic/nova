@@ -58,12 +58,13 @@ def _extract_json_with_repair(agent_name: str, text: str) -> dict:
 
     print(f"{agent_name}: JSON parse failed, attempting Haiku repair")
     client = anthropic.Anthropic(api_key=get_secret("nova/factory/anthropic-api-key"))
-    repair = client.messages.create(
+    with client.messages.stream(
         model="claude-haiku-4-5-20251001",
         max_tokens=8192,
         system=_REPAIR_SYSTEM,
         messages=[{"role": "user", "content": text[:50000]}],
-    )
+    ) as stream:
+        repair = stream.get_final_message()
     repaired = repair.content[0].text.strip()
     return _try_parse(repaired)
 
@@ -88,12 +89,13 @@ def call_agent(
     last_exc: Exception | None = None
     for attempt, delay in enumerate((*_RETRY_DELAYS, None), start=1):
         try:
-            msg = client.messages.create(
+            with client.messages.stream(
                 model=model,
                 max_tokens=max_tokens,
                 system=system_prompt,
                 messages=messages,
-            )
+            ) as stream:
+                msg = stream.get_final_message()
         except (anthropic.APIConnectionError, anthropic.APITimeoutError, anthropic.RateLimitError) as e:
             last_exc = e
             if delay is None:

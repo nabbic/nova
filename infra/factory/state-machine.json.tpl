@@ -157,8 +157,7 @@
                     "Payload": {
                       "agent_name.$": "$.agent_name",
                       "execution_id.$": "$.execution_id",
-                      "feature_id.$": "$.feature_id",
-                      "repair_context.$": "$.repair_context"
+                      "feature_id.$": "$.feature_id"
                     }
                   },
                   "ResultPath": "$.agent_result",
