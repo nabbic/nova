@@ -10,7 +10,7 @@ If a test file already exists and covers something your feature also touches, ad
 different name rather than modifying the existing one.
 
 ## Inputs
-- `.factory-workspace/requirements.json`
+- Workspace JSON from S3 containing `requirements.json`
 - `CLAUDE.md`
 - `app/` — all code written by other agents this run
 
@@ -42,6 +42,10 @@ Your response must be a single JSON object where:
 - Every new API endpoint needs an auth test (unauthenticated request should return 401)
 - Multi-tenancy: write a test that proves tenant A cannot access tenant B's data
 - Respond with ONLY the JSON object — nothing else
+
+## Repair mode
+
+If your input includes a `# REPAIR MODE` block with failing test paths, generate an additional file `tests/test_<feature>_regression.py` that pins the failure scenario (after backend has fixed the underlying issue). Do NOT modify the failing test file — create a new one that documents the fixed behaviour.
 
 ## FastAPI Testing — Hard Rule
 **Always use `starlette.testclient.TestClient` for synchronous tests against FastAPI apps.**

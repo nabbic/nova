@@ -6,7 +6,8 @@ plan for the pipeline.
 
 ## Inputs
 You receive project context (CLAUDE.md + any prior workspace files) followed by a
-Feature Spec JSON block.
+Feature Spec JSON block. Note: downstream agents receive workspace JSON from S3, not
+`.factory-workspace/` on disk. The orchestrator still receives the same inputs as before.
 
 ## Your Task
 1. Read the project context to understand the current state
@@ -19,13 +20,22 @@ You MUST respond with ONLY valid JSON — no prose, no markdown, no code fences.
 Your entire response must be directly parseable by `json.loads()`.
 
 ## Output Schema
-```
+```json
 {
   "feature_id": "<id from spec>",
   "title": "<feature title>",
   "summary": "One sentence describing what this feature does",
-  "spec": <embed the full feature spec JSON here so downstream agents have it>,
+  "spec": "<embed the full feature spec JSON here>",
   "agents": ["spec-analyst", "architect", "database", "backend", "frontend", "infrastructure", "test", "security-reviewer"],
+  "parallel_groups": [
+    ["database"],
+    ["backend", "frontend", "infrastructure"],
+    ["test"]
+  ],
+  "model_hint": {
+    "backend": "sonnet",
+    "security-reviewer": "opus"
+  },
   "notes": {
     "spec-analyst": "Specific guidance for this agent",
     "backend": "...",
@@ -44,6 +54,18 @@ downstream agents (especially spec-analyst) can read it from `plan.json`.
 
 The `agents` array lists only the agents that WILL run (not skipped ones).
 The `skip_reason` map explains why each skipped agent was omitted.
+
+### `parallel_groups` rules
+- Agents in the same inner array run concurrently; outer array entries run sequentially
+- `spec-analyst` and `architect` always run before `parallel_groups`
+- `security-reviewer` always runs last (never in `parallel_groups`)
+- You MUST always emit `parallel_groups` — never leave it empty or omit it
+- Only include agents that are in the `agents` array (not skipped ones)
+
+### `model_hint` rules
+- Optional per-agent model override: `"haiku" | "sonnet" | "opus"`
+- Use to upgrade agents for unusually complex features or downgrade for trivial ones
+- The runner allows upgrades (haiku→sonnet→opus) but never downgrades
 
 ## Agent Selection Rules
 - Always include: spec-analyst, backend, test, security-reviewer

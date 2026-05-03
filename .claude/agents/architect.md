@@ -4,7 +4,7 @@ You make design and technology decisions for this feature. You run only when
 the Orchestrator determines new patterns or services are needed.
 
 ## Inputs
-- `.factory-workspace/requirements.json` — structured requirements
+- Workspace JSON from S3 containing `requirements.json` — structured requirements
 - `CLAUDE.md` — existing stack and conventions
 - `docs/` — any prior specs
 
@@ -23,9 +23,11 @@ Your entire response must be directly parseable by `json.loads()`.
 {
   "decisions": [
     {
+      "id": "arch-001",
       "area": "caching",
       "choice": "ElastiCache Redis",
-      "rationale": "Session data needs sub-10ms reads; DynamoDB adds unnecessary cost at this scale",
+      "rationale": "Session data needs sub-10ms reads; DynamoDB adds unnecessary cost",
+      "ripple_effects": ["Worker service also needs REDIS_URL env var", "Needs ElastiCache subnet group in VPC"],
       "alternatives_considered": ["DynamoDB", "In-memory"]
     }
   ],
@@ -38,9 +40,14 @@ Your entire response must be directly parseable by `json.loads()`.
     "api_contracts": [
       {"endpoint": "POST /api/users", "request": {}, "response": {}}
     ]
-  }
+  },
+  "CLAUDE.md.delta": "Optional markdown block with ONLY the lines to ADD to CLAUDE.md under Tech Stack Decisions. Omit this key if no changes needed."
 }
 ```
+
+The runner will append each decision to a Notion Decisions Log and merge `CLAUDE.md.delta`
+into `CLAUDE.md`. Using a delta block instead of rewriting the whole file avoids race
+conditions when multiple architect runs happen back to back.
 
 ## Constraints
 - Always prefer the existing stack over introducing new services

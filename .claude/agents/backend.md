@@ -3,10 +3,7 @@
 You implement the server-side logic for this feature.
 
 ## Inputs
-- `.factory-workspace/plan.json` — orchestrator plan and notes for you
-- `.factory-workspace/requirements.json` — structured requirements
-- `.factory-workspace/architecture.json` (if exists)
-- `.factory-workspace/migrations.json` (if exists)
+- Workspace JSON from S3 containing `plan.json`, `requirements.json`, `architecture.json` (if exists), and `migrations.json` (if exists)
 - `CLAUDE.md` — project context and constraints
 - `app/` — existing codebase
 
@@ -48,7 +45,13 @@ async def hello() -> HelloResponse:
 - If `requirements.txt` already exists in the repo, extend it — do not replace it
 
 ## Containerization — Hard Requirement
-**Every feature that touches `app/` MUST include these files in the file map.**
+**Every feature that touches `app/` MUST include these files in the file map only when needed** (see rule below).
+
+Include `Dockerfile`, `.dockerignore`, and `docker-compose.yml` in your file map ONLY IF:
+(a) they do not already exist in the repository, OR
+(b) this feature specifically requires a change to them (e.g., new CMD, new stage, new env var).
+
+The runner will diff the existing files against your output and **reject regenerations that don't change anything** — so do NOT include them just to be safe.
 
 ### 1. `/health` endpoint
 `app/main.py` must always expose a `/health` route — no auth, no database call:
@@ -169,7 +172,7 @@ Your response must be a single JSON object where:
 - Keys are file paths relative to the repository root (e.g., `"app/api/routes/hello.py"`)
 - Values are the complete file contents as strings (use `\n` for newlines)
 
-Always include `"requirements.txt"`, `"docs/openapi.json"`, `"Dockerfile"`, `".dockerignore"`, and `"docker-compose.yml"` in your file map. If these already exist and don't need changes, include them with their current contents — never omit them.
+Always include `"requirements.txt"` and `"docs/openapi.json"` in your file map. Include `"Dockerfile"`, `".dockerignore"`, and `"docker-compose.yml"` only if they are new or require changes for this feature (see Containerization section above).
 
 ## Database Initialization — Hard Rule
 **Never raise errors or connect to the database at module import time.**
@@ -196,6 +199,46 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSession(get_engine()) as session:
         yield session
 ```
+
+## Self-check
+
+After generating files, include a `_self_check` JSON key (sibling to file paths in the file map) listing:
+- Which acceptance criteria each file satisfies
+- Which acceptance criteria are NOT yet covered by your output
+
+Example:
+```json
+{
+  "app/api/routes/version.py": "...",
+  "_self_check": {
+    "covered": ["GET /api/version returns 200", "auth middleware applied"],
+    "not_covered": ["rate limiting — deferred to infrastructure agent"]
+  }
+}
+```
+
+## Repair mode
+
+If your input includes a `# REPAIR MODE` block, you are receiving validation failures
+from the previous attempt. Your job is to:
+
+1. Read the `validation_errors` array carefully — each entry has a `tool` and `output`.
+2. Identify which file(s) caused each failure.
+3. Output a file map containing ONLY the files you are changing to fix the issues.
+4. Do NOT regenerate files that aren't related to the failures.
+5. Do NOT modify tests in `tests/` to make them pass — fix the underlying code.
+6. If a failure looks like a tool/environment issue, include `_repair_notes` JSON key explaining why.
+
+Common failure patterns and the right repair:
+
+| Failure | Repair |
+|---------|--------|
+| `mypy: error: Module has no attribute "X"` | Add the missing import or remove the bad reference |
+| `ruff: F401 unused import` | Remove the import |
+| `import-check: ImportError` | Move the failing import inside a function |
+| `import-check: KeyError on os.environ['X']` | Make the env-var read lazy (inside a function) |
+| `docker build: COPY failed: file not found` | Add the missing file or fix the COPY path |
+| `curl /health: Connection refused` | Check the CMD in Dockerfile; ensure /health exists |
 
 ## Constraints
 - All buyer-scoped DB queries must include `buyer_org_id` filter — no exceptions
