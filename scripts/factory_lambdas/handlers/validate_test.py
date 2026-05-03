@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import tempfile
@@ -5,6 +6,8 @@ import time
 from pathlib import Path
 from common.workspace import list_code_files, read_code_file
 from common.runs import record_step
+
+_PKGS = "/tmp/test-pkgs"
 
 
 def _materialize(execution_id: str) -> Path:
@@ -16,8 +19,9 @@ def _materialize(execution_id: str) -> Path:
     return tmp
 
 
-def _run(cmd: list[str], cwd: Path) -> tuple[int, str]:
-    p = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=120)
+def _run(cmd: list[str], cwd: Path, extra_env: dict | None = None) -> tuple[int, str]:
+    env = {**os.environ, **(extra_env or {})}
+    p = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=180, env=env)
     return p.returncode, (p.stdout + p.stderr)[:8000]
 
 
@@ -28,9 +32,19 @@ def handler(event, _ctx):
     ws = _materialize(execution_id)
     issues = []
     try:
+        req = ws / "requirements.txt"
+        if req.exists() and not Path(_PKGS).exists():
+            _run(["pip", "install", "-q", "-r", "requirements.txt",
+                  "--target", _PKGS, "--no-compile"], ws)
+
         tests_dir = ws / "tests"
         if tests_dir.exists():
-            rc, out = _run(["python", "-m", "pytest", "--collect-only", "-q", "tests/"], ws)
+            pythonpath = _PKGS + ":" + str(ws) + ":" + os.environ.get("PYTHONPATH", "")
+            rc, out = _run(
+                ["python", "-m", "pytest", "--collect-only", "-q", "tests/"],
+                ws,
+                extra_env={"PYTHONPATH": pythonpath},
+            )
             if rc != 0:
                 issues.append({"tool": "pytest-collect", "output": out})
     finally:
