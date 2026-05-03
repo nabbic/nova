@@ -10,9 +10,12 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
 
+    // Always log incoming event type for observability
+    console.log("Received:", JSON.stringify({ type: body.type, entityId: body.entity?.id }));
+
     // Notion webhook verification challenge
     if (body.verification_token) {
-      console.log("Verification token:", body.verification_token);
+      console.log("Verification challenge — echoing token");
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
@@ -20,36 +23,34 @@ exports.handler = async (event) => {
       };
     }
 
-    // Only handle page property update events
-    if (body.type !== "page.properties_updated") {
-      return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: "not a property update" }) };
-    }
-
-    // Only act when Status was one of the changed properties
-    const updatedProperties = body?.data?.updated_properties || [];
-    if (!updatedProperties.includes("Status")) {
-      return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: "Status not changed" }) };
+    // Accept both property-update and generic page-update events
+    const HANDLED_TYPES = ["page.properties_updated", "page.updated"];
+    if (!HANDLED_TYPES.includes(body.type)) {
+      console.log("Skipping unhandled event type:", body.type);
+      return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: "unhandled type", type: body.type }) };
     }
 
     const featureId = body?.entity?.id;
     if (!featureId) {
+      console.log("No entity ID in payload");
       return { statusCode: 400, body: JSON.stringify({ error: "No page ID in webhook payload" }) };
     }
 
     // Fetch the page to confirm Status is still "Ready to Build"
     // (user may have changed it again before we processed the event)
     const status = await getPageStatus(featureId);
+    console.log(`Page ${featureId} status: "${status}"`);
+
     if (status !== TARGET_STATUS) {
-      console.log(`Page ${featureId} Status is "${status}" — skipping`);
-      return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: `status is ${status}` }) };
+      return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: `status is "${status}"` }) };
     }
 
     await triggerGitHubActions(featureId);
-    console.log(`Triggered factory for feature ${featureId}`);
+    console.log(`Factory triggered for feature ${featureId}`);
     return { statusCode: 200, body: JSON.stringify({ triggered: true, featureId }) };
 
   } catch (err) {
-    console.error("Relay error:", err);
+    console.error("Relay error:", err.message, err.stack);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
@@ -72,7 +73,12 @@ function getPageStatus(pageId) {
       res.on("end", () => {
         try {
           const page = JSON.parse(data);
-          const status = page?.properties?.Status?.select?.name || null;
+          // Notion "Status" properties are type "status", not "select"
+          // Support both in case the DB was set up either way
+          const status =
+            page?.properties?.Status?.status?.name ||
+            page?.properties?.Status?.select?.name ||
+            null;
           resolve(status);
         } catch (e) {
           reject(new Error(`Failed to parse Notion response: ${e.message}`));

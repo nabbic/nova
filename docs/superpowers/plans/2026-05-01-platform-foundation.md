@@ -6,7 +6,7 @@
 
 **Architecture:** FastAPI async backend with SQLAlchemy + asyncpg against RDS PostgreSQL. Cognito provides two user pools — one for buyer org users, one for seller engagement accounts. JWT middleware validates tokens on every protected route. All queries filter by `buyer_org_id` (the tenant key). A React frontend scaffold provides login, org dashboard, and seller invitation acceptance.
 
-**Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2.x (async), asyncpg, Alembic, pydantic-settings, python-jose[cryptography], React 18 + TypeScript, AWS Amplify (Cognito auth), Terraform
+**Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2.x (async), asyncpg, Alembic, pydantic-settings, python-jose[cryptography], React 18 + TypeScript, Vite, React Router, amazon-cognito-identity-js, Terraform
 
 ---
 
@@ -76,18 +76,21 @@ infra/
 frontend/
   src/
     main.tsx
-    App.tsx            — router + Amplify config
+    App.tsx                 — BrowserRouter + AuthProvider
+    auth/
+      cognito.ts            — CognitoUserPool instances + signIn/signUp/getIdToken helpers
+      AuthContext.tsx       — React context: current session, loading flag, useAuth hook
     pages/
-      Login.tsx        — Cognito hosted UI redirect
-      OrgDashboard.tsx — list engagements for the buyer org
-      AcceptInvitation.tsx — seller invitation acceptance flow
+      Login.tsx             — sign-in form (buyer pool)
+      OrgDashboard.tsx      — list engagements for the buyer org
+      AcceptInvitation.tsx  — seller sign-up + invitation acceptance
     components/
-      RoleGuard.tsx    — redirect if wrong role
+      RoleGuard.tsx         — redirect to /login if no active session
       NavBar.tsx
     api/
-      client.ts        — axios instance with auth header
-      engagements.ts   — API calls for engagements
-    types/index.ts     — shared TypeScript types matching API schemas
+      client.ts             — axios instance with auto-injected ID token
+      engagements.ts        — API calls for engagements
+    types/index.ts          — shared TypeScript types matching API schemas
   package.json
   tsconfig.json
   vite.config.ts
@@ -2116,8 +2119,8 @@ git commit -m "feat: add Terraform modules for Cognito user pools and RDS Postgr
 ```bash
 npm create vite@latest frontend -- --template react-ts
 cd frontend && npm install
-npm install @aws-amplify/ui-react aws-amplify axios react-router-dom
-npm install -D @types/react-router-dom
+npm install amazon-cognito-identity-js axios react-router-dom
+npm install -D @types/amazon-cognito-identity-js @types/react-router-dom
 ```
 
 - [ ] **Step 2: Create `frontend/src/types/index.ts`**
@@ -2149,19 +2152,124 @@ export interface Invitation {
 }
 ```
 
-- [ ] **Step 3: Create `frontend/src/api/client.ts`**
+- [ ] **Step 3: Create `frontend/src/auth/cognito.ts`**
+
+```typescript
+import {
+  CognitoUserPool,
+  CognitoUser,
+  AuthenticationDetails,
+  CognitoUserSession,
+  CognitoUserAttribute,
+  ISignUpResult,
+} from 'amazon-cognito-identity-js';
+
+export const buyerPool = new CognitoUserPool({
+  UserPoolId: import.meta.env.VITE_COGNITO_BUYER_USER_POOL_ID as string,
+  ClientId: import.meta.env.VITE_COGNITO_BUYER_CLIENT_ID as string,
+});
+
+export const sellerPool = new CognitoUserPool({
+  UserPoolId: import.meta.env.VITE_COGNITO_SELLER_USER_POOL_ID as string,
+  ClientId: import.meta.env.VITE_COGNITO_SELLER_CLIENT_ID as string,
+});
+
+export function signIn(
+  email: string,
+  password: string,
+  pool: CognitoUserPool,
+): Promise<CognitoUserSession> {
+  return new Promise((resolve, reject) => {
+    const user = new CognitoUser({ Username: email, Pool: pool });
+    user.authenticateUser(
+      new AuthenticationDetails({ Username: email, Password: password }),
+      { onSuccess: resolve, onFailure: reject },
+    );
+  });
+}
+
+export function signUp(
+  email: string,
+  password: string,
+  pool: CognitoUserPool,
+): Promise<ISignUpResult> {
+  return new Promise((resolve, reject) => {
+    const attrs = [new CognitoUserAttribute({ Name: 'email', Value: email })];
+    pool.signUp(email, password, attrs, [], (err, result) => {
+      if (err || !result) return reject(err);
+      resolve(result);
+    });
+  });
+}
+
+export function getIdToken(pool: CognitoUserPool): Promise<string | null> {
+  return new Promise((resolve) => {
+    const user = pool.getCurrentUser();
+    if (!user) return resolve(null);
+    user.getSession((err: Error | null, session: CognitoUserSession | null) => {
+      if (err || !session?.isValid()) return resolve(null);
+      resolve(session.getIdToken().getJwtToken());
+    });
+  });
+}
+
+export function signOut(pool: CognitoUserPool): void {
+  pool.getCurrentUser()?.signOut();
+}
+```
+
+- [ ] **Step 4: Create `frontend/src/auth/AuthContext.tsx`**
+
+```typescript
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
+import { type CognitoUserSession } from 'amazon-cognito-identity-js';
+import { buyerPool } from './cognito';
+
+interface AuthState {
+  session: CognitoUserSession | null;
+  loading: boolean;
+}
+
+const AuthContext = createContext<AuthState>({ session: null, loading: true });
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<AuthState>({ session: null, loading: true });
+
+  useEffect(() => {
+    const cognitoUser = buyerPool.getCurrentUser();
+    if (!cognitoUser) {
+      setState({ session: null, loading: false });
+      return;
+    }
+    cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
+      setState({ session: session?.isValid() ? session : null, loading: false });
+    });
+  }, []);
+
+  return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
+}
+
+export const useAuth = () => useContext(AuthContext);
+```
+
+- [ ] **Step 5: Create `frontend/src/api/client.ts`**
 
 ```typescript
 import axios from 'axios';
-import { fetchAuthSession } from 'aws-amplify/auth';
+import { getIdToken, buyerPool } from '../auth/cognito';
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000',
 });
 
 client.interceptors.request.use(async (config) => {
-  const session = await fetchAuthSession();
-  const token = session.tokens?.idToken?.toString();
+  const token = await getIdToken(buyerPool);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -2171,7 +2279,7 @@ client.interceptors.request.use(async (config) => {
 export default client;
 ```
 
-- [ ] **Step 4: Create `frontend/src/api/engagements.ts`**
+- [ ] **Step 6: Create `frontend/src/api/engagements.ts`**
 
 ```typescript
 import client from './client';
@@ -2180,51 +2288,87 @@ import type { Engagement } from '../types';
 export const listEngagements = (orgId: string): Promise<Engagement[]> =>
   client.get(`/orgs/${orgId}/engagements`).then((r) => r.data);
 
-export const createEngagement = (orgId: string, data: { name: string; target_company_name: string }): Promise<Engagement> =>
+export const createEngagement = (
+  orgId: string,
+  data: { name: string; target_company_name: string },
+): Promise<Engagement> =>
   client.post(`/orgs/${orgId}/engagements`, data).then((r) => r.data);
 ```
 
-- [ ] **Step 5: Create `frontend/src/components/RoleGuard.tsx`**
+- [ ] **Step 7: Create `frontend/src/components/RoleGuard.tsx`**
 
 ```typescript
-import { useAuthenticator } from '@aws-amplify/ui-react';
 import { Navigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 
 interface RoleGuardProps {
   allowedRoles: string[];
   children: React.ReactNode;
 }
 
-export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
-  const { user } = useAuthenticator();
-  const role = user?.signInDetails?.loginId ?? '';
-  // Role is stored in Cognito custom attribute — adapt once Amplify exposes it
-  if (!user) return <Navigate to="/login" replace />;
+export function RoleGuard({ allowedRoles: _allowedRoles, children }: RoleGuardProps) {
+  const { session, loading } = useAuth();
+  if (loading) return null;
+  if (!session) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 ```
 
-- [ ] **Step 6: Create `frontend/src/pages/Login.tsx`**
+- [ ] **Step 8: Create `frontend/src/pages/Login.tsx`**
 
 ```typescript
-import { Authenticator } from '@aws-amplify/ui-react';
-import '@aws-amplify/ui-react/styles.css';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { signIn, buyerPool } from '../auth/cognito';
 
 export function Login() {
   const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await signIn(email, password, buyerPool);
+      navigate('/dashboard');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Sign in failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <Authenticator>
-      {({ signOut, user }) => {
-        if (user) navigate('/dashboard');
-        return <div>Signing in...</div>;
-      }}
-    </Authenticator>
+    <form onSubmit={handleSubmit}>
+      <h1>Sign In</h1>
+      {error && <p role="alert">{error}</p>}
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        required
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+        required
+      />
+      <button type="submit" disabled={submitting}>
+        {submitting ? 'Signing in…' : 'Sign In'}
+      </button>
+    </form>
   );
 }
 ```
 
-- [ ] **Step 7: Create `frontend/src/pages/OrgDashboard.tsx`**
+- [ ] **Step 9: Create `frontend/src/pages/OrgDashboard.tsx`**
 
 ```typescript
 import { useEffect, useState } from 'react';
@@ -2241,7 +2385,7 @@ export function OrgDashboard({ orgId }: { orgId: string }) {
       .finally(() => setLoading(false));
   }, [orgId]);
 
-  if (loading) return <div>Loading engagements...</div>;
+  if (loading) return <div>Loading engagements…</div>;
 
   return (
     <div>
@@ -2259,13 +2403,12 @@ export function OrgDashboard({ orgId }: { orgId: string }) {
 }
 ```
 
-- [ ] **Step 8: Create `frontend/src/pages/AcceptInvitation.tsx`**
+- [ ] **Step 10: Create `frontend/src/pages/AcceptInvitation.tsx`**
 
 ```typescript
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Authenticator } from '@aws-amplify/ui-react';
-import '@aws-amplify/ui-react/styles.css';
+import { signUp, signIn, sellerPool } from '../auth/cognito';
 import client from '../api/client';
 import type { Invitation } from '../types';
 
@@ -2273,71 +2416,91 @@ export function AcceptInvitation() {
   const { token } = useParams<{ token: string }>();
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // Public endpoint — no auth header needed
     client.get(`/invitations/${token}`)
       .then((r) => setInvitation(r.data))
       .catch(() => setError('Invitation not found or expired.'));
   }, [token]);
 
-  if (error) return <div>Error: {error}</div>;
-  if (!invitation) return <div>Loading...</div>;
+  const handleAccept = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!invitation) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      // Sign up in the seller pool (account is created on invitation acceptance)
+      await signUp(invitation.email, password, sellerPool);
+      // Sign in immediately to get a session
+      const session = await signIn(invitation.email, password, sellerPool);
+      const cognitoSub = session.getIdToken().payload['sub'] as string;
+      await client.post(`/invitations/${token}/accept`, { token, cognito_sub: cognitoSub });
+      setDone(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to accept invitation');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (error) return <div role="alert">Error: {error}</div>;
+  if (!invitation) return <div>Loading…</div>;
+  if (done) return <div>Invitation accepted. You can now access the seller portal.</div>;
 
   return (
     <div>
       <h1>You have been invited to a Technical Due Diligence engagement</h1>
       <p>Email: {invitation.email}</p>
-      <p>Type: {invitation.invitation_type}</p>
-      <Authenticator initialState="signUp">
-        {({ user }) => {
-          if (user) {
-            client.post(`/invitations/${token}/accept`, {
-              token,
-              cognito_sub: user.userId,
-            });
-            return <div>Invitation accepted. You can now access the seller portal.</div>;
-          }
-          return <div>Create your account to accept the invitation.</div>;
-        }}
-      </Authenticator>
+      <p>Role: {invitation.invitation_type}</p>
+      <form onSubmit={handleAccept}>
+        <p>Choose a password to create your account:</p>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          required
+          minLength={8}
+        />
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Create account & accept'}
+        </button>
+      </form>
     </div>
   );
 }
 ```
 
-- [ ] **Step 9: Create `frontend/src/App.tsx`**
+- [ ] **Step 11: Create `frontend/src/App.tsx`**
 
 ```typescript
-import { Amplify } from 'aws-amplify';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './auth/AuthContext';
 import { Login } from './pages/Login';
 import { OrgDashboard } from './pages/OrgDashboard';
 import { AcceptInvitation } from './pages/AcceptInvitation';
 
-Amplify.configure({
-  Auth: {
-    Cognito: {
-      userPoolId: import.meta.env.VITE_COGNITO_BUYER_USER_POOL_ID,
-      userPoolClientId: import.meta.env.VITE_COGNITO_BUYER_CLIENT_ID,
-    },
-  },
-});
-
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<OrgDashboard orgId={import.meta.env.VITE_ORG_ID ?? ''} />} />
-        <Route path="/invite/:token" element={<AcceptInvitation />} />
-        <Route path="*" element={<Login />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<OrgDashboard orgId={import.meta.env.VITE_ORG_ID ?? ''} />} />
+          <Route path="/invite/:token" element={<AcceptInvitation />} />
+          <Route path="*" element={<Login />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 ```
 
-- [ ] **Step 10: Verify frontend builds**
+- [ ] **Step 12: Verify frontend builds**
 
 ```bash
 cd frontend && npm run build
@@ -2345,7 +2508,7 @@ cd frontend && npm run build
 
 Expected: build succeeds with no TypeScript errors.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
 git add frontend/

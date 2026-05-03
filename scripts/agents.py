@@ -1,11 +1,14 @@
 import json
 import os
 import re
+import time
 from pathlib import Path
 
 import anthropic
 
 MODEL = "claude-sonnet-4-6"
+_MAX_RETRIES = 3
+_RETRY_DELAYS = [5, 15, 30]  # seconds between attempts
 ROOT = Path(__file__).parent.parent
 WORKSPACE = ROOT / ".factory-workspace"
 AGENTS_DIR = ROOT / ".claude/agents"
@@ -47,13 +50,32 @@ def _extract_json(text: str):
 def _call_agent(agent_name: str, user_message: str) -> str:
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     system_prompt = _load_system_prompt(agent_name)
-    message = client.messages.create(
-        model=MODEL,
-        max_tokens=16384,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_message}],
-    )
-    return message.content[0].text
+
+    last_exc: Exception | None = None
+    for attempt, delay in enumerate((*_RETRY_DELAYS, None), start=1):
+        try:
+            message = client.messages.create(
+                model=MODEL,
+                max_tokens=16384,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+            )
+            return message.content[0].text
+        except (anthropic.APIConnectionError, anthropic.APITimeoutError, anthropic.RateLimitError) as exc:
+            last_exc = exc
+            if delay is None:
+                break
+            print(f"  {agent_name}: transient error on attempt {attempt}/{_MAX_RETRIES} — retrying in {delay}s: {exc}")
+            time.sleep(delay)
+        except anthropic.APIStatusError as exc:
+            if exc.status_code >= 500 and delay is not None:
+                last_exc = exc
+                print(f"  {agent_name}: server error {exc.status_code} on attempt {attempt}/{_MAX_RETRIES} — retrying in {delay}s")
+                time.sleep(delay)
+            else:
+                raise
+
+    raise RuntimeError(f"{agent_name} failed after {_MAX_RETRIES} attempts: {last_exc}") from last_exc
 
 
 def _build_agent_context(agent_name: str, plan: dict) -> str:
@@ -80,16 +102,18 @@ def run_agent(agent_name: str, plan: dict = None) -> str:
         path = WORKSPACE / WORKSPACE_AGENTS[agent_name]
         path.write_text(json.dumps(data, indent=2))
     elif agent_name in CODE_AGENTS:
-        try:
-            files = _extract_json(response)
-            if isinstance(files, dict):
-                for rel_path, content in files.items():
-                    abs_path = ROOT / rel_path
-                    abs_path.parent.mkdir(parents=True, exist_ok=True)
-                    abs_path.write_text(content, encoding="utf-8")
-                print(f"  {agent_name}: wrote {len(files)} file(s)")
-        except Exception as exc:
-            print(f"  WARNING: {agent_name} response could not be parsed as file map: {exc}")
+        files = _extract_json(response)
+        if not isinstance(files, dict):
+            raise RuntimeError(
+                f"{agent_name} returned a {type(files).__name__} instead of a JSON file map"
+            )
+        if not files:
+            raise RuntimeError(f"{agent_name} returned an empty file map — no files written")
+        for rel_path, content in files.items():
+            abs_path = ROOT / rel_path
+            abs_path.parent.mkdir(parents=True, exist_ok=True)
+            abs_path.write_text(content, encoding="utf-8")
+        print(f"  {agent_name}: wrote {len(files)} file(s)")
 
     return response
 

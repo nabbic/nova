@@ -20,6 +20,21 @@ This repository is built and maintained by the Nova Software Factory — an auto
 multi-agent CI/CD pipeline. Features flow from Notion → GitHub Actions → AWS.
 Never manually edit files that agents own unless you update this doc to reflect it.
 
+## Secrets Strategy — Hard Requirement
+All secrets follow a strict tiering. Violations will be caught by the Security Reviewer and block the build.
+
+| Where secret lives | What goes here |
+|---|---|
+| **AWS Secrets Manager** (`nova/*/...`) | Application runtime secrets: database credentials, Cognito client secrets, third-party API keys the running app needs, invitation signing keys |
+| **GitHub Actions Secrets** | CI/CD secrets only: `ANTHROPIC_API_KEY`, `NOTION_API_KEY`, `GH_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. These are ephemeral pipeline credentials, not application config. |
+| **ECS task definition `secrets:` block** | References to Secrets Manager or Parameter Store ARNs only — never plaintext values |
+| **ECS task definition `environment:` block** | Non-secret config only: `ENVIRONMENT`, `LOG_LEVEL`, etc. |
+
+**Never:**
+- Hardcode any secret in source code, Terraform HCL, or Dockerfiles
+- Put application secrets in `environment:` blocks — use `secrets:` with a Secrets Manager ARN
+- Store secrets in `.env` files committed to the repo
+
 ## Architecture Constraints
 - **12-factor methodology** is non-negotiable (https://12factor.net/)
 - Config via environment variables only — never hardcoded, never committed
@@ -131,13 +146,13 @@ in the `scoring_config` table (versioned) and are configurable per engagement.
 
 | # | Category | Default Weight |
 |---|---|---|
-| 1 | Security | 25% |
-| 2 | Compliance | 20% |
-| 3 | Infrastructure | 15% |
-| 4 | Code Quality | 15% |
-| 5 | Engineering Process | 12% |
-| 6 | Dependencies | 8% |
-| 7 | IT Operations | 10% |
+| 1 | Security | 23% |
+| 2 | Compliance | 18% |
+| 3 | Infrastructure | 13% |
+| 4 | Code Quality | 13% |
+| 5 | Engineering Process | 11% |
+| 6 | IT Operations | 10% |
+| 7 | Dependencies | 7% |
 | 8 | Documentation | 5% |
 
 ## Scoring Model
@@ -196,4 +211,14 @@ Orchestrator coordinates all agents. Do not call agents directly.
 - `docs/openapi.json` — always up to date, committed by factory on API changes
 
 ## Tech Stack Decisions (maintained by Architect agent)
-_See Extended Stack table above. Architect appends further decisions here as they are made._
+
+| Library / Tool | Version constraint | Decision |
+|---|---|---|
+| Vite | `>=5.0,<6.0` | Build tool for the React frontend — scaffolded with `npm create vite@latest --template react-ts` |
+| React Router | `react-router-dom>=6.0,<7.0` | Client-side routing in the React SPA |
+| axios | `>=1.6,<2.0` | HTTP client for frontend→API calls |
+| amazon-cognito-identity-js | `>=6.3,<7.0` | Cognito auth in the React frontend — native AWS library; handles both buyer and seller pools independently without Amplify framework overhead |
+| asyncpg | `>=0.29,<1.0` | Async PostgreSQL driver for SQLAlchemy `AsyncSession` |
+| python-jose[cryptography] | `>=3.3,<4.0` | JWT decoding and validation for Cognito tokens in the backend |
+| pydantic-settings | `>=2.0,<3.0` | Settings management from environment variables (12-factor) |
+| Alembic | `>=1.13,<2.0` | Database migrations — all migrations are Python files under `app/db/migrations/` |

@@ -54,6 +54,32 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# Allow Lambda to read its own secrets from Secrets Manager
+resource "aws_iam_role_policy" "lambda_secrets" {
+  name = "nova-webhook-relay-secrets"
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "secretsmanager:GetSecretValue"
+      Resource = [
+        "arn:aws:secretsmanager:${var.aws_region}:*:secret:nova/webhook-relay/*",
+      ]
+    }]
+  })
+}
+
+# Read secrets from Secrets Manager — no plaintext in Terraform variables or state
+data "aws_secretsmanager_secret_version" "notion_api_key" {
+  secret_id = "nova/webhook-relay/notion-api-key"
+}
+
+data "aws_secretsmanager_secret_version" "github_token" {
+  secret_id = "nova/webhook-relay/github-token"
+}
+
 resource "aws_lambda_function" "webhook_relay" {
   function_name    = "nova-webhook-relay"
   filename         = data.archive_file.lambda_zip.output_path
@@ -67,8 +93,8 @@ resource "aws_lambda_function" "webhook_relay" {
     variables = {
       GITHUB_OWNER   = var.github_owner
       GITHUB_REPO    = var.github_repo
-      GITHUB_TOKEN   = var.github_token
-      NOTION_API_KEY = var.notion_api_key
+      GITHUB_TOKEN   = data.aws_secretsmanager_secret_version.github_token.secret_string
+      NOTION_API_KEY = data.aws_secretsmanager_secret_version.notion_api_key.secret_string
     }
   }
 

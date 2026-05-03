@@ -14,6 +14,7 @@ Usage:
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -132,7 +133,8 @@ def cmd_build(feature_id: str) -> None:
         set_status(feature_id, "In Progress")
         spec = load_spec(feature_id)
 
-        slug = spec["title"].lower().replace(" ", "-")[:50]
+        # Strip every character that git disallows in branch names; collapse hyphens
+        slug = re.sub(r"[^a-z0-9]+", "-", spec["title"].lower()).strip("-")[:50]
         branch_name = f"feature/{slug}-{int(time.time())}"
         create_branch(branch_name)
 

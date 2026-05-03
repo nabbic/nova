@@ -157,7 +157,7 @@ A full engagement runs in 9 steps:
 
 3. **Seller connects systems** — guided wizard for each connector category: source code, cloud infrastructure, productivity tools, observability, etc. Each connector shows exactly what read-only access is requested. For on-prem components, OS-level agent download with install guide. Sellers can upload documents manually for anything not covered by a connector. Estimated connection time: 20–45 minutes depending on number of integrations.
 
-4. **Agents run autonomously** — all 7 agents execute in parallel where possible. Jobs are queued via SQS and processed by async workers. Both sides see live progress per category. No human input required. Estimated processing time: 2–6 hours depending on codebase and infrastructure size.
+4. **Agents run autonomously** — all 8 agents execute in parallel where possible. Jobs are queued via SQS and processed by async workers. Both sides see live progress per category. No human input required. Estimated processing time: 2–6 hours depending on codebase and infrastructure size.
 
 5. **AI synthesises findings** — synthesis layer reads all structured findings, generates impact narrative per finding, produces executive summary with overall risk score, flags critical issues, and compiles the full report draft.
 
@@ -448,8 +448,9 @@ The Nova baseline (ECS Fargate, RDS PostgreSQL, Cognito, Cloudflare, FastAPI, Te
 | Compute | ECS Fargate | Web app + async scan workers both run on Fargate |
 | Database | RDS PostgreSQL | Application data, engagement records, findings store, scoring config |
 | Auth | AWS Cognito | Separate user pools for buyer org users and seller engagement users |
+| Frontend auth SDK | amazon-cognito-identity-js | Native AWS Cognito library for React; handles both buyer and seller pools independently without Amplify framework overhead |
 | Edge | Cloudflare (CDN, WAF) | |
-| Frontend | React SaaS web app | |
+| Frontend | React 18 + TypeScript, Vite, React Router | SPA; built with Vite, client routing via react-router-dom |
 | Backend | FastAPI (Python) | Strong fit: async support, Pydantic for structured agent outputs |
 | Async job queue | SQS + ECS workers | Scan jobs dispatched via SQS, consumed by async ECS worker tasks. Parallel agent execution, decoupled from web request latency. |
 | File storage | S3 | Uploaded seller documents, scan artefacts, generated PDFs, AI artefacts |
