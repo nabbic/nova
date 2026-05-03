@@ -11,11 +11,34 @@ env:
   ECR_WORKER_REPO: nova-worker
 
 jobs:
+  # ── Pre-flight checks ──────────────────────────────────────────────────────
+  preflight:
+    name: Pre-flight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Workspace pre-flight
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          if [ -f app/main.py ]; then
+            grep -q '"/health"' app/main.py || grep -q "'/health'" app/main.py \
+              || fail "/health endpoint missing from app/main.py"
+            python3 -c "import ast; ast.parse(open('app/main.py').read())" \
+              || fail "app/main.py is not syntactically valid Python"
+          fi
+          if [ -f Dockerfile ] && [ ! -f requirements.txt ]; then
+            fail "Dockerfile present but requirements.txt missing"
+          fi
+          echo "Pre-flight passed"
+
   # ── Build & push container images ─────────────────────────────────────────
   build-and-push:
     name: Build & Push Images
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: preflight
     # Only run if a Dockerfile exists — skip gracefully during early infra-only phases
     outputs:
       api_image: ${{ steps.push.outputs.api_image }}
@@ -82,7 +105,7 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: build-and-push
+    needs: [preflight, build-and-push]
     environment: staging
 
     steps:
@@ -182,7 +205,7 @@ jobs:
     name: Deploy to Production
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [build-and-push, deploy-staging]
+    needs: [preflight, build-and-push, deploy-staging]
     environment: production
 
     steps:

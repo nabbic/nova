@@ -16,6 +16,13 @@ provider "aws" {
   region = var.aws_region
 }
 
+data "terraform_remote_state" "factory" {
+  backend = "local"
+  config = {
+    path = "${path.module}/../factory/terraform.tfstate"
+  }
+}
+
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/lambda"
@@ -52,6 +59,19 @@ resource "aws_iam_role" "lambda_exec" {
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_states" {
+  name = "nova-webhook-relay-states"
+  role = aws_iam_role.lambda_exec.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "states:StartExecution"
+      Resource = data.terraform_remote_state.factory.outputs.state_machine_arn
+    }]
+  })
 }
 
 # Allow Lambda to read its own secrets from Secrets Manager
@@ -91,10 +111,12 @@ resource "aws_lambda_function" "webhook_relay" {
 
   environment {
     variables = {
-      GITHUB_OWNER   = var.github_owner
-      GITHUB_REPO    = var.github_repo
-      GITHUB_TOKEN   = data.aws_secretsmanager_secret_version.github_token.secret_string
-      NOTION_API_KEY = data.aws_secretsmanager_secret_version.notion_api_key.secret_string
+      GITHUB_OWNER      = var.github_owner
+      GITHUB_REPO       = var.github_repo
+      GITHUB_TOKEN      = data.aws_secretsmanager_secret_version.github_token.secret_string
+      NOTION_API_KEY    = data.aws_secretsmanager_secret_version.notion_api_key.secret_string
+      FACTORY_BACKEND   = "github-actions"  # flip to "step-functions" in Phase 8 cutover
+      STATE_MACHINE_ARN = data.terraform_remote_state.factory.outputs.state_machine_arn
     }
   }
 

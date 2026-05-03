@@ -1,3 +1,5 @@
+# DEPRECATED 2026-05-03 — superseded by quality-gates.yml + Step Functions pipeline.
+# Kept for emergency fallback. Remove after 30 days of stable operation.
 name: Nova Factory
 
 on:

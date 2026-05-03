@@ -1,0 +1,118 @@
+name: Nova Quality Gates
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        required: true
+        type: string
+      pr_number:
+        required: true
+        type: string
+      task_token:
+        required: true
+        type: string
+
+concurrency:
+  group: quality-gates-${{ github.event.inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          pip install -r requirements.txt 2>/dev/null || true
+          pip install ruff mypy pytest pytest-asyncio httpx starlette
+
+      - name: Workspace pre-flight
+        if: hashFiles('app/**/*.py') != ''
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [ -f requirements.txt ] || fail "missing requirements.txt — backend agent did not produce it"
+          if [ -f app/main.py ]; then
+            grep -q '"/health"' app/main.py || grep -q "'/health'" app/main.py \
+              || fail "/health endpoint missing from app/main.py"
+            python -c "import ast, sys; ast.parse(open('app/main.py').read())" \
+              || fail "app/main.py is not syntactically valid Python"
+          fi
+
+      - name: Auto-format & lint fix
+        id: fmt
+        if: hashFiles('app/**/*.py') != ''
+        run: |
+          ruff format app/
+          ruff check app/ --fix --unsafe-fixes || true
+          if ! git diff --quiet; then
+            git config user.name  "Nova Factory"
+            git config user.email "factory@nova.build"
+            git add app/
+            git commit -m "style: auto-fix ruff"
+            git push origin HEAD
+          fi
+
+      - name: Lint
+        if: hashFiles('app/**/*.py') != ''
+        run: ruff check app/
+
+      - name: Types
+        if: hashFiles('app/**/*.py') != ''
+        run: mypy app/ --ignore-missing-imports || true
+
+      - name: Tests
+        run: |
+          if find tests/ -name "test_*.py" 2>/dev/null | grep -q .; then
+            pytest tests/ -x -q --tb=short
+          else
+            echo "no tests found, skipping"
+          fi
+
+      - name: Docker build
+        if: hashFiles('Dockerfile') != ''
+        run: docker build -t nova-api:gate .
+
+      - name: Terraform validate
+        if: hashFiles('infra/main.tf') != ''
+        run: |
+          curl -fsSL https://releases.hashicorp.com/terraform/1.7.5/terraform_1.7.5_linux_amd64.zip -o tf.zip
+          unzip -q tf.zip && sudo mv terraform /usr/local/bin/
+          cd infra && terraform init -backend=false && terraform validate
+
+      - name: Merge PR (success)
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          gh pr review ${{ inputs.pr_number }} --approve
+          gh pr merge ${{ inputs.pr_number }} --squash --admin --delete-branch
+
+      - name: Notify Step Functions (success)
+        if: success()
+        env:
+          CALLBACK_URL: ${{ secrets.FACTORY_CALLBACK_URL }}
+        run: |
+          curl -fsSL -X POST "$CALLBACK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"task_token\":\"${{ inputs.task_token }}\",\"passed\":true,\"logs_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+
+      - name: Notify Step Functions (failure)
+        if: failure()
+        env:
+          CALLBACK_URL: ${{ secrets.FACTORY_CALLBACK_URL }}
+        run: |
+          curl -fsSL -X POST "$CALLBACK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"task_token\":\"${{ inputs.task_token }}\",\"passed\":false,\"error\":\"Quality gate failed — see ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"

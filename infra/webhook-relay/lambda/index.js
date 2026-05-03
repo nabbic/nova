@@ -1,9 +1,13 @@
 const https = require("https");
+const { SFNClient, StartExecutionCommand } = require("@aws-sdk/client-sfn");
+const sfn = new SFNClient({ region: process.env.AWS_REGION || "us-east-1" });
 
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
 const GITHUB_REPO = process.env.GITHUB_REPO;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
+const FACTORY_BACKEND = process.env.FACTORY_BACKEND || "github-actions";
+const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN || "";
 const TARGET_STATUS = "Ready to Build";
 const NOTION_VERSION = "2022-06-28";
 
@@ -69,9 +73,14 @@ exports.handler = async (event) => {
       }
     }
 
-    await triggerGitHubActions(featureId);
-    console.log(`Factory triggered for feature ${featureId}`);
-    return { statusCode: 200, body: JSON.stringify({ triggered: true, featureId }) };
+    if (FACTORY_BACKEND === "step-functions") {
+      await startStateMachine(featureId);
+      console.log(`Step Functions triggered for feature ${featureId}`);
+    } else {
+      await triggerGitHubActions(featureId);
+      console.log(`Factory triggered for feature ${featureId} via GitHub Actions`);
+    }
+    return { statusCode: 200, body: JSON.stringify({ triggered: true, featureId, backend: FACTORY_BACKEND }) };
 
   } catch (err) {
     console.error("Relay error:", err.message, err.stack);
@@ -155,6 +164,16 @@ function setPageStatus(pageId, statusName) {
     req.write(payload);
     req.end();
   });
+}
+
+async function startStateMachine(featureId) {
+  // Strip hyphens from featureId to create a valid execution name (alphanumeric + hyphens + underscores, max 80 chars)
+  const safeName = `${featureId.replace(/-/g, "")}-${Date.now()}`.slice(0, 80);
+  await sfn.send(new StartExecutionCommand({
+    stateMachineArn: STATE_MACHINE_ARN,
+    name: safeName,
+    input: JSON.stringify({ feature_id: featureId }),
+  }));
 }
 
 function triggerGitHubActions(featureId) {

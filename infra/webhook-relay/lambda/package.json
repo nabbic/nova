@@ -1,7 +1,9 @@
 {
   "name": "nova-webhook-relay",
   "version": "1.0.0",
-  "description": "Relays Notion webhooks to GitHub Actions",
+  "description": "Relays Notion webhooks to GitHub Actions or Step Functions",
   "main": "index.js",
-  "dependencies": {}
+  "dependencies": {
+    "@aws-sdk/client-sfn": "^3.0.0"
+  }
 }
