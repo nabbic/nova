@@ -103,16 +103,20 @@ jobs:
         if: success()
         env:
           CALLBACK_URL: ${{ secrets.FACTORY_CALLBACK_URL }}
+          CALLBACK_API_KEY: ${{ secrets.FACTORY_CALLBACK_API_KEY }}
         run: |
           curl -fsSL -X POST "$CALLBACK_URL" \
             -H "Content-Type: application/json" \
+            -H "x-api-key: $CALLBACK_API_KEY" \
             -d "{\"task_token\":\"${{ inputs.task_token }}\",\"passed\":true,\"logs_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
 
       - name: Notify Step Functions (failure)
         if: failure()
         env:
           CALLBACK_URL: ${{ secrets.FACTORY_CALLBACK_URL }}
+          CALLBACK_API_KEY: ${{ secrets.FACTORY_CALLBACK_API_KEY }}
         run: |
           curl -fsSL -X POST "$CALLBACK_URL" \
             -H "Content-Type: application/json" \
+            -H "x-api-key: $CALLBACK_API_KEY" \
             -d "{\"task_token\":\"${{ inputs.task_token }}\",\"passed\":false,\"error\":\"Quality gate failed — see ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"

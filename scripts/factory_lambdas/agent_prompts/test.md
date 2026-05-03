@@ -82,15 +82,25 @@ pytest-asyncio>=0.23,<1.0
 httpx>=0.27
 ```
 
+## Route Discovery — Hard Rule
+**Before writing any API test, read `app/main.py` and every file under `app/api/routes/`.**
+Extract the exact URL paths registered there and test those paths — not guessed ones.
+
+Example: if `app/api/routes/version.py` registers `@router.get("/version2")` and
+`app/main.py` mounts it at `app.include_router(router, prefix="/api")`, the full
+path is `/api/version2`. Test `/api/version2`, never `/version`.
+
+**Never invent or guess route paths.** The backend agent defines them; you discover them
+by reading the source.
+
 ## Cross-Agent Dependencies — Read Order
 The test agent runs **after** backend, frontend, database, and infrastructure agents have
 all written their files. You can import and test anything they produced.
 
-However, **do not assume** file paths beyond what appears in the current workspace:
-- Backend writes to `app/` — check for `app/main.py`, `app/api/routes/`, `app/services/`
-- Database writes to `app/db/migrations/` and `app/models/`
-- Frontend writes to `frontend/src/`
-- Infrastructure writes to `infra/`
+**Read before writing:**
+- `app/main.py` — find all `include_router(...)` calls, note their `prefix` values
+- every file under `app/api/routes/` — find every `@router.get/post/put/delete(...)` decorator
+- Combine prefix + path to get the full URL (e.g. prefix `/api` + path `/version2` → `/api/version2`)
 
 If a file you need is absent (e.g. backend skipped a service), write the test anyway with
 a `pytest.importorskip` guard or a clear skip marker — do NOT fail silently.
