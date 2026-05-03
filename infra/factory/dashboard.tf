@@ -75,6 +75,61 @@ resource "aws_cloudwatch_metric_alarm" "execution_failures" {
   tags = local.common_tags
 }
 
+resource "aws_cloudwatch_query_definition" "pipeline_errors" {
+  name = "${local.name_prefix}/pipeline-errors"
+  log_group_names = [
+    for k in keys(local.handlers) :
+    "/aws/lambda/${local.name_prefix}-${replace(k, "_", "-")}"
+  ]
+  query_string = <<-EOQ
+    fields @timestamp, @message
+    | filter @message like /ERROR|Exception|Traceback/
+    | sort @timestamp desc
+    | limit 100
+  EOQ
+}
+
+resource "aws_cloudwatch_query_definition" "agent_durations" {
+  name = "${local.name_prefix}/agent-durations"
+  log_group_names = [
+    "/aws/lambda/${local.name_prefix}-run-agent",
+  ]
+  query_string = <<-EOQ
+    fields @timestamp, @message
+    | filter @message like /record_step|"status"/
+    | parse @message '"agent": "*"' as agent
+    | parse @message '"elapsed": *,' as elapsed
+    | stats avg(elapsed) as avg_s, max(elapsed) as max_s, count() as runs by agent
+    | sort avg_s desc
+  EOQ
+}
+
+resource "aws_cloudwatch_query_definition" "validation_failures" {
+  name = "${local.name_prefix}/validation-failures"
+  log_group_names = [
+    "/aws/lambda/${local.name_prefix}-validate-workspace",
+  ]
+  query_string = <<-EOQ
+    fields @timestamp, @message
+    | filter @message like /passed.*false|failing_owners/
+    | sort @timestamp desc
+    | limit 50
+  EOQ
+}
+
+resource "aws_cloudwatch_query_definition" "smoke_run_history" {
+  name = "${local.name_prefix}/smoke-run-history"
+  log_group_names = [
+    "/aws/lambda/${local.name_prefix}-acquire-lock",
+  ]
+  query_string = <<-EOQ
+    fields @timestamp, @requestId, @message
+    | filter @message like /FeatureLocked|locked.*true/
+    | sort @timestamp desc
+    | limit 50
+  EOQ
+}
+
 resource "aws_budgets_budget" "factory_monthly" {
   name         = "${local.name_prefix}-monthly"
   budget_type  = "COST"
