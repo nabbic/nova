@@ -17,12 +17,14 @@ echo "=== Updating zip-based Lambda functions ==="
 for ZIP in "$LAMBDAS_DIR/dist"/*.zip; do
   HANDLER=$(basename "$ZIP" .zip)
   FUNC="${PREFIX}-${HANDLER//_/-}"
+  # Convert POSIX path to Windows path for the fileb:// URI (required on Windows)
+  WIN_ZIP=$(cygpath -w "$ZIP" 2>/dev/null || echo "$ZIP")
   # Check the function exists before trying to update
   if aws lambda get-function --function-name "$FUNC" --region "$REGION" \
        --query 'Configuration.FunctionName' --output text 2>/dev/null | grep -q "$FUNC"; then
     aws lambda update-function-code \
       --function-name "$FUNC" \
-      --zip-file "fileb://$ZIP" \
+      --zip-file "fileb://$WIN_ZIP" \
       --region "$REGION" \
       --output json \
       --query '{FunctionName:FunctionName,CodeSha256:CodeSha256}' &
