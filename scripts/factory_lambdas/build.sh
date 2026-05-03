@@ -34,6 +34,11 @@ for handler in "$HERE"/handlers/*.py; do
   STAGE=$(mktemp -d)
   cp -r "$HERE/common" "$STAGE/"
   cp -r "$PROMPTS_DST" "$STAGE/agent_prompts"
+  # v2: ship the canonical PRD schema and system prompts in every zip
+  mkdir -p "$STAGE/.factory"
+  cp "$REPO_ROOT/.factory/prd.schema.json"        "$STAGE/.factory/"
+  cp "$REPO_ROOT/.factory/implementer-system.md"  "$STAGE/.factory/" 2>/dev/null || true
+  cp "$REPO_ROOT/.factory/reviewer-system.md"     "$STAGE/.factory/" 2>/dev/null || true
   cp "$handler" "$STAGE/$name.py"
   _zip "$DIST/$name.zip" "$STAGE"
   rm -rf "$STAGE"
