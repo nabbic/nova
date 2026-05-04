@@ -1,0 +1,13 @@
+{
+  "passed": false,
+  "blockers": [
+    {
+      "category": "tenancy",
+      "file":     "app/repositories/engagement.py",
+      "line":     42,
+      "description": "list_engagements does not filter by buyer_org_id",
+      "fix":      "Add WHERE buyer_org_id = :buyer_org_id to the query"
+    }
+  ],
+  "warnings": []
+}
