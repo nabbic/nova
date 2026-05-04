@@ -99,13 +99,21 @@ def handler(event, _ctx):
     slug  = "".join(c if c.isalnum() else "-" for c in title.lower()).strip("-")[:50]
     branch = f"feature/{slug}-{int(time.time())}"
 
-    # Build the tree from workspace/ paths
-    tree_items = []
-    workspace_files = _list_workspace(execution_id)
-    if not workspace_files:
-        raise RuntimeError(f"Workspace empty for {execution_id} — RalphTurn produced no files")
+    # Read RalphTurn's list of files that changed vs origin/main
+    changed_list_text = _try_read_text(execution_id, "workspace/changed-files.txt")
+    if not changed_list_text or not changed_list_text.strip():
+        raise RuntimeError(f"changed-files.txt missing or empty for {execution_id} — RalphTurn produced no diff")
+    changed_files = [line.strip() for line in changed_list_text.splitlines() if line.strip()]
 
-    # Write .factory/last-run/* into the tree (NOT into S3 — directly into git)
+    # Filter: skip RalphTurn-internal artifacts; the actual implementation
+    # files are what we want in the PR.
+    SKIP_INTERNAL = {"diff.patch", "changed-files.txt", "progress.txt", "repair_context.md", "prd.json"}
+    changed_files = [f for f in changed_files if f not in SKIP_INTERNAL]
+
+    if not changed_files:
+        raise RuntimeError(f"No real file changes for {execution_id} (only internal artifacts changed)")
+
+    # Always inject .factory/last-run/* artifacts (for the postdeploy probe)
     last_run_blobs: dict[str, bytes] = {
         ".factory/last-run/prd.json":  json.dumps(prd, indent=2).encode("utf-8"),
         ".factory/last-run/meta.json": json.dumps({
@@ -117,13 +125,21 @@ def handler(event, _ctx):
     if progress is not None:
         last_run_blobs[".factory/last-run/progress.txt"] = progress.encode("utf-8")
 
-    # Merge: workspace paths first, then last-run overrides (in case workspace also wrote them)
+    # Build the source map: only changed files + last-run artifacts
     sources: dict[str, bytes] = {}
-    for rel in workspace_files:
-        sources[rel] = _read_workspace_bytes(execution_id, rel)
+    for rel in changed_files:
+        try:
+            sources[rel] = _read_workspace_bytes(execution_id, rel)
+        except _s3.exceptions.NoSuchKey:
+            # File was deleted — handle deletion in the tree (sha=None)
+            sources[rel] = b""  # placeholder; we'll mark as delete below
     sources.update(last_run_blobs)
 
+    tree_items = []
     for rel, content in sources.items():
+        # Detect deletion: source not in workspace (after gitignore filter) means deleted
+        # For simplicity in v2 we don't yet handle deletions distinctly — RalphTurn
+        # rarely deletes files. Add explicit delete handling later if needed.
         blob = _gh("POST", "/git/blobs", {
             "content":  base64.b64encode(content).decode("ascii"),
             "encoding": "base64",

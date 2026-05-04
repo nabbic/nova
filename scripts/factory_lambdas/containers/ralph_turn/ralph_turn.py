@@ -334,25 +334,35 @@ def handler(event, _ctx):
 
     _commit_intra_turn()
 
-    # Write a diff.patch (origin/main..HEAD) for the Review Lambda to read.
+    # Write diff.patch (for Review) and changed-files.txt (for CommitAndPush)
+    # against origin/main, with fallback to pre_turn_sha if the remote ref is
+    # missing.
     diff_path = WS_ROOT / "diff.patch"
-    diff_proc = subprocess.run(
-        ["git", "diff", "origin/main..HEAD"],
-        cwd=WS_ROOT, capture_output=True, text=True,
-    )
-    if diff_proc.returncode == 0:
-        diff_path.write_text(diff_proc.stdout, encoding="utf-8")
-        print(f"[ralph] wrote diff.patch ({len(diff_proc.stdout)} bytes)", flush=True)
+    changes_path = WS_ROOT / "changed-files.txt"
+
+    def _git_diff_against(ref: str) -> tuple[str, list[str]] | None:
+        d = subprocess.run(
+            ["git", "diff", f"{ref}..HEAD"],
+            cwd=WS_ROOT, capture_output=True, text=True,
+        )
+        n = subprocess.run(
+            ["git", "diff", "--name-only", f"{ref}..HEAD"],
+            cwd=WS_ROOT, capture_output=True, text=True,
+        )
+        if d.returncode == 0 and n.returncode == 0:
+            return d.stdout, [line for line in n.stdout.splitlines() if line.strip()]
+        return None
+
+    diff_result = _git_diff_against("origin/main")
+    if diff_result is None and pre_turn_sha:
+        diff_result = _git_diff_against(pre_turn_sha)
+    if diff_result is not None:
+        diff_text, changed_files_list = diff_result
+        diff_path.write_text(diff_text, encoding="utf-8")
+        changes_path.write_text("\n".join(changed_files_list) + "\n", encoding="utf-8")
+        print(f"[ralph] wrote diff.patch ({len(diff_text)} bytes) + changed-files.txt ({len(changed_files_list)} entries)", flush=True)
     else:
-        # Fallback: diff against pre_turn_sha (works even without origin/main ref)
-        if pre_turn_sha:
-            diff_proc = subprocess.run(
-                ["git", "diff", pre_turn_sha, "HEAD"],
-                cwd=WS_ROOT, capture_output=True, text=True,
-            )
-            if diff_proc.returncode == 0:
-                diff_path.write_text(diff_proc.stdout, encoding="utf-8")
-                print(f"[ralph] wrote diff.patch via pre_turn_sha ({len(diff_proc.stdout)} bytes)", flush=True)
+        print("[ralph] WARNING: could not compute diff vs main", flush=True)
 
     _upload_workspace(execution_id)
 
