@@ -179,12 +179,22 @@ def _run_claude(user_prompt: str) -> dict:
     print(f"[ralph] claude exit={proc.returncode} elapsed={elapsed:.0f}s stdout_len={len(proc.stdout)} stderr_len={len(proc.stderr)}", flush=True)
     if proc.stderr:
         print(f"[ralph] claude stderr (last 1000 chars):\n{proc.stderr[-1000:]}", flush=True)
+    # Parse stdout first — claude exit=1 with subtype=error_max_turns is a
+    # benign "ran out of inner turns; preserve progress and let SFN loop run
+    # another RalphTurn" signal, not a hard failure.
+    out: dict = {}
+    if proc.stdout.strip():
+        try:
+            out = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            if proc.returncode != 0:
+                raise RuntimeError(f"claude exit {proc.returncode}, non-JSON stdout: {proc.stdout[-2000:]}")
+    benign_subtypes = {"error_max_turns"}
     if proc.returncode != 0:
-        raise RuntimeError(f"claude exit {proc.returncode}: stderr=\n{proc.stderr[-4000:]}\nstdout=\n{proc.stdout[-2000:]}")
-    try:
-        out = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        raise RuntimeError(f"claude returned non-JSON: {proc.stdout[-2000:]}")
+        subtype = out.get("subtype", "")
+        if subtype not in benign_subtypes:
+            raise RuntimeError(f"claude exit {proc.returncode} subtype={subtype!r}: stderr=\n{proc.stderr[-2000:]}\nstdout=\n{proc.stdout[-1000:]}")
+        print(f"[ralph] claude exited {proc.returncode} with benign subtype={subtype}; preserving progress", flush=True)
     # Log the result summary
     result_text = (out.get("result") or "")[:1500]
     print(f"[ralph] claude result (first 1500 chars):\n{result_text}", flush=True)
