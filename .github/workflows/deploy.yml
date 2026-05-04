@@ -294,3 +294,38 @@ jobs:
           else
             echo "ECS service not yet provisioned — skipping force-redeploy"
           fi
+
+
+  # ── Trigger postdeploy verification SFN ───────────────────────────────────
+  trigger-postdeploy:
+    name: Trigger postdeploy verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [deploy-staging]
+    if: success()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Read .factory/last-run/meta.json + start postdeploy SFN
+        run: |
+          if [[ ! -f .factory/last-run/meta.json ]]; then
+            echo "no .factory/last-run/meta.json on this commit — not a factory-built feature; skipping postdeploy"
+            exit 0
+          fi
+          FEATURE_ID="$(python3 -c "import json; print(json.load(open('.factory/last-run/meta.json'))['feature_id'])")"
+          MERGE_SHA="$(git rev-parse HEAD)"
+          aws stepfunctions start-execution \
+            --state-machine-arn arn:aws:states:us-east-1:577638385116:stateMachine:nova-factory-postdeploy \
+            --name "postdeploy-${MERGE_SHA:0:8}-$(date +%s)" \
+            --input "{\"feature_id\":\"$FEATURE_ID\",\"merge_sha\":\"$MERGE_SHA\"}"
