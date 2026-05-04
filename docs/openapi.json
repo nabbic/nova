@@ -1,0 +1,56 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Nova API",
+    "description": "Nova Technical Due Diligence Platform API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/version": {
+      "get": {
+        "summary": "Get API version",
+        "operationId": "get_version_api_version_get",
+        "responses": {
+          "200": {
+            "description": "Current API version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Version Api Version Get"
+                },
+                "example": {
+                  "version": "1.0"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/version-v2": {
+      "get": {
+        "summary": "Get API version v2",
+        "operationId": "get_version_v2_api_version_v2_get",
+        "responses": {
+          "200": {
+            "description": "v2 API version identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Version V2 Api Version V2 Get"
+                },
+                "example": {
+                  "version": "2.0"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
