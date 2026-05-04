@@ -18,3 +18,9 @@ variable "workspace_retention_days" {
   default     = 14
   description = "How long to keep factory workspace S3 objects before lifecycle deletes them"
 }
+
+variable "staging_url" {
+  type        = string
+  default     = "https://httpbin.org"
+  description = "Base URL the postdeploy probe hits. Defaults to httpbin.org until real staging is provisioned (the probe parser tolerates 'no_http_probes' for runs that don't add HTTP-shape acceptance criteria)."
+}

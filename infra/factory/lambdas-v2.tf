@@ -9,6 +9,8 @@ locals {
     mark_blocked        = { timeout = 30,  memory = 256  }
     review              = { timeout = 180, memory = 1024 }
     commit_and_push_v2  = { timeout = 300, memory = 1024 }
+    probe_staging       = { timeout = 60,  memory = 512  }
+    revert_merge        = { timeout = 120, memory = 512  }
   }
 }
 
@@ -35,6 +37,7 @@ resource "aws_lambda_function" "handlers_v2" {
       GITHUB_OWNER     = var.github_owner
       GITHUB_REPO      = var.github_repo
       PLAN_MODEL       = "claude-haiku-4-5"
+      STAGING_URL      = var.staging_url
     }
   }
 
