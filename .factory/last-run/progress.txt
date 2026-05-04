@@ -1,8 +1,4 @@
 ## Turn 1
-- elapsed: 343s
-- changed (allowed): ['app/api/routes/engagements.py', 'app/core/', 'app/main.py', 'app/models/', 'app/repositories/', 'app/schemas/', 'docs/openapi.json', 'prd.json', 'tests/integration/', 'tests/unit/']
-
-## Turn 2
-- elapsed: 74s
-- changed (allowed): ['app/api/routes/engagements.py', 'app/core/auth.py', 'changed-files.txt', 'diff.patch', 'prd.json', 'progress.txt', 'repair_context.md']
+- elapsed: 100s
+- changed (allowed): ['app/api/health.py', 'app/main.py', 'docs/openapi.json', 'prd.json', 'progress.txt', 'tests/test_health_info.py']
 

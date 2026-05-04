@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.health import router as health_info_router
 from app.api.routes import engagements, version
 
 app = FastAPI(
@@ -15,4 +16,5 @@ async def health() -> dict:
 
 
 app.include_router(version.router, prefix="/api")
+app.include_router(health_info_router, prefix="/api")
 app.include_router(engagements.router, prefix="/api")
