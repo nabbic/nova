@@ -19,6 +19,8 @@ class EngagementRepository:
         total: int = count_result.scalar_one()
 
         result = await self.db.execute(
-            base_query.order_by(Engagement.created_at.desc()).limit(limit).offset(offset)
+            base_query.order_by(Engagement.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
         return list(result.scalars().all()), total

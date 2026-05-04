@@ -45,6 +45,8 @@ async def list_engagements(
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedEngagements:
     repo = EngagementRepository(db)
-    orm_items, total = await repo.list_by_buyer_org(buyer_org_id, limit=limit, offset=offset)
+    orm_items, total = await repo.list_by_buyer_org(
+        buyer_org_id, limit=limit, offset=offset
+    )
     items = [EngagementResponse.model_validate(e) for e in orm_items]
     return PaginatedEngagements(items=items, total=total, limit=limit, offset=offset)
