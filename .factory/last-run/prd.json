@@ -1,55 +1,32 @@
 {
-  "feature_id": "3560930a-bc71-81bf-8b0d-d45fa6643d90",
-  "title": "Factory v2 smoke \u2013 engagement listing endpoint",
-  "narrative_md": "# Factory v2 smoke \u2013 engagement listing endpoint\n\n## Description\n\nAdd GET /api/engagements that lists engagements for the calling buyer org. Pagination via limit/offset query params.\n\n## Tech Notes\n\nUse the existing engagements repository and tenant-filter pattern. Add response schema to docs/openapi.json. Cover with unit + integration tests.\n\n## Acceptance Criteria\n\n- 200 with paginated list when authenticated as a buyer org user\n- 401 when unauthenticated\n- Empty list when no engagements exist for the org\n- docs/openapi.json includes the endpoint with query params and response schema\n\n## Out of Scope\n\nFiltering, sorting, search",
+  "feature_id": "3560930a-bc71-811f-9588-e01ac8ae7322",
+  "title": "Factory v2 cutover smoke health endpoint version",
+  "narrative_md": "# Factory v2 cutover smoke \u2013 health endpoint version\n\n## Description\n\nAdd a tiny GET /api/health-info endpoint returning {\"factory_generation\": \"v2\", \"cutover_at\": \"2026-05-04\"}.\n\n## Tech Notes\n\nMirror /api/version-v2 pattern. Update docs/openapi.json. No auth.\n\n## Acceptance Criteria\n\n- 200 with the JSON body when called without auth\n- docs/openapi.json includes /api/health-info\n\n## Out of Scope\n\nAuthentication; metric collection",
   "stories": [
     {
       "id": "s1",
-      "description": "Add GET /api/engagements endpoint that returns 200 with paginated list for authenticated buyer org users",
+      "description": "Add GET /api/health-info endpoint",
       "acceptance_criteria": [
-        "Returns 200 with paginated engagement list when authenticated as a buyer org user",
-        "Supports limit and offset query params for pagination",
-        "Filters engagements to calling buyer org only using tenant-filter pattern",
-        "Returns empty list when no engagements exist for the org"
+        "200 with the JSON body when called without auth"
       ],
       "passes": false
     },
     {
       "id": "s2",
-      "description": "Add authentication check to reject unauthenticated requests",
+      "description": "Update OpenAPI schema",
       "acceptance_criteria": [
-        "Returns 401 when request is unauthenticated"
-      ],
-      "passes": false
-    },
-    {
-      "id": "s3",
-      "description": "Update docs/openapi.json with endpoint schema",
-      "acceptance_criteria": [
-        "docs/openapi.json includes GET /api/engagements endpoint definition with query params (limit, offset) and response schema"
-      ],
-      "passes": false
-    },
-    {
-      "id": "s4",
-      "description": "Add unit and integration tests",
-      "acceptance_criteria": [
-        "Unit tests cover endpoint logic and tenant filtering",
-        "Integration tests cover 200, 401, and empty list scenarios"
+        "docs/openapi.json includes /api/health-info"
       ],
       "passes": false
     }
   ],
   "scope": {
-    "touches_db": true,
+    "touches_db": false,
     "touches_frontend": false,
     "touches_infra": false,
     "files_in_scope": [
-      "app/api/engagements.py",
-      "app/repositories/engagements.py",
-      "docs/openapi.json",
-      "tests/unit/api/test_engagements.py",
-      "tests/integration/api/test_engagements.py"
+      "app/api/health.py",
+      "docs/openapi.json"
     ]
   },
   "hard_blockers": [],

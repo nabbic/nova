@@ -52,6 +52,30 @@
         }
       }
     },
+    "/api/health-info": {
+      "get": {
+        "summary": "Get factory health info",
+        "operationId": "get_health_info_api_health_info_get",
+        "responses": {
+          "200": {
+            "description": "Factory generation and cutover date",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Health Info Api Health Info Get"
+                },
+                "example": {
+                  "factory_generation": "v2",
+                  "cutover_at": "2026-05-04"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/engagements": {
       "get": {
         "summary": "List engagements for the calling buyer org",
