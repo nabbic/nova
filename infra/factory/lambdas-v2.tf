@@ -11,6 +11,7 @@ locals {
     commit_and_push_v2  = { timeout = 300, memory = 1024 }
     probe_staging       = { timeout = 60,  memory = 512  }
     revert_merge        = { timeout = 120, memory = 512  }
+    auto_pause          = { timeout = 30,  memory = 256  }
   }
 }
 
@@ -38,6 +39,7 @@ resource "aws_lambda_function" "handlers_v2" {
       GITHUB_REPO      = var.github_repo
       PLAN_MODEL       = "claude-haiku-4-5"
       STAGING_URL      = var.staging_url
+      PAUSED_PARAM     = aws_ssm_parameter.factory_paused.name
     }
   }
 
