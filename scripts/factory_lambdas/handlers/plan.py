@@ -59,7 +59,19 @@ Hard rules:
 - Always include feature_id verbatim from feature_meta.json.
 - Always include the original narrative_md verbatim from spec_raw.md.
 
-If the feature is clearly too large, you may populate `suggested_split` —
+CRITICAL — keep stories and criteria MINIMAL:
+- Use the human-provided acceptance criteria VERBATIM where possible.
+- Do NOT expand criteria into implementation details. If the spec says
+  "returns 200 with engagement data", do NOT split that into 3 criteria
+  about response status, content-type, and body shape.
+- Aim for ≤4 stories and ≤12 total acceptance criteria across all stories.
+  If you cannot fit the work in those limits, populate `suggested_split`
+  instead of producing a large PRD — the orchestrator will block the
+  feature for human decomposition.
+- Each story should be ONE verb (e.g., "Add the endpoint", "Update the
+  OpenAPI schema") — not a multi-step procedure.
+
+If the feature is clearly too large, populate `suggested_split` —
 the orchestrator's deterministic rubric will set the actual hard_blockers.
 You should NOT set hard_blockers yourself — leave that to the orchestrator.
 

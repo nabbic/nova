@@ -44,7 +44,7 @@ PAGE_PAYLOAD=$(jq -n \
      parent: {database_id: $db},
      properties: {
        Title:                 {title:    [{text: {content: $t}}]},
-       Status:                {status:   {name: "Ready to Build"}},
+       Status:                {select:   {name: "Ready to Build"}},
        Description:           {rich_text:[{text: {content: $d}}]},
        "Tech Notes":          {rich_text:[{text: {content: $n}}]},
        "Acceptance Criteria": {rich_text:[{text: {content: $a}}]},
@@ -91,10 +91,10 @@ echo "==> Notion page status: $NOTION_STATUS"
 
 case "$EXPECTED" in
   plan_passes_no_blockers)
-    if [[ "$STATUS" == "SUCCEEDED" ]]; then
+    if [[ "$STATUS" == "SUCCEEDED" && "$NOTION_STATUS" != "Failed" ]]; then
       echo "OK — execution succeeded as expected"; exit 0
     fi
-    echo "FAIL — expected SUCCEEDED, got $STATUS" >&2; exit 1
+    echo "FAIL — expected SUCCEEDED + Notion!=Failed, got SFN=$STATUS Notion=$NOTION_STATUS" >&2; exit 1
     ;;
   plan_blocks_with_feature_too_large)
     if [[ "$STATUS" == "SUCCEEDED" && "$NOTION_STATUS" == "Failed" ]]; then
