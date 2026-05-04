@@ -83,6 +83,20 @@ resource "aws_iam_role_policy" "lambda_states" {
   })
 }
 
+# Read /nova/factory/paused so the relay can short-circuit when paused.
+resource "aws_iam_role_policy" "lambda_ssm" {
+  name = "nova-webhook-relay-ssm"
+  role = aws_iam_role.lambda_exec.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "ssm:GetParameter"
+      Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/nova/factory/paused"
+    }]
+  })
+}
+
 # Allow Lambda to read its own secrets from Secrets Manager
 resource "aws_iam_role_policy" "lambda_secrets" {
   name = "nova-webhook-relay-secrets"
@@ -126,6 +140,7 @@ resource "aws_lambda_function" "webhook_relay" {
       NOTION_API_KEY    = data.aws_secretsmanager_secret_version.notion_api_key.secret_string
       FACTORY_BACKEND   = "github-actions"  # flip to "step-functions" in Phase 8 cutover
       STATE_MACHINE_ARN = data.terraform_remote_state.factory.outputs.state_machine_arn
+      PAUSED_PARAM      = "/nova/factory/paused"
     }
   }
 

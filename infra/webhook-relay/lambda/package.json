@@ -4,6 +4,7 @@
   "description": "Relays Notion webhooks to GitHub Actions or Step Functions",
   "main": "index.js",
   "dependencies": {
-    "@aws-sdk/client-sfn": "^3.0.0"
+    "@aws-sdk/client-sfn": "^3.0.0",
+    "@aws-sdk/client-ssm": "^3.0.0"
   }
 }

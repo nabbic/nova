@@ -1,6 +1,8 @@
 const https = require("https");
 const { SFNClient, StartExecutionCommand } = require("@aws-sdk/client-sfn");
+const { SSMClient, GetParameterCommand } = require("@aws-sdk/client-ssm");
 const sfn = new SFNClient({ region: process.env.AWS_REGION || "us-east-1" });
+const ssm = new SSMClient({ region: process.env.AWS_REGION || "us-east-1" });
 
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
 const GITHUB_REPO = process.env.GITHUB_REPO;
@@ -8,8 +10,43 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const FACTORY_BACKEND = process.env.FACTORY_BACKEND || "github-actions";
 const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN || "";
+const PAUSED_PARAM = process.env.PAUSED_PARAM || "/nova/factory/paused";
 const TARGET_STATUS = "Ready to Build";
 const NOTION_VERSION = "2022-06-28";
+
+async function isFactoryPaused() {
+  try {
+    const out = await ssm.send(new GetParameterCommand({ Name: PAUSED_PARAM }));
+    return (out.Parameter?.Value || "false").toLowerCase().trim() === "true";
+  } catch (e) {
+    if (e.name === "ParameterNotFound") return false;
+    console.error("Failed to read pause flag:", e.message);
+    return false;  // Fail open — webhook still dispatches if SSM is degraded
+  }
+}
+
+async function postNotionComment(featureId, content) {
+  const payload = JSON.stringify({
+    parent: { page_id: featureId },
+    rich_text: [{ text: { content: content.slice(0, 2000) } }],
+  });
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: "api.notion.com",
+      path: "/v1/comments",
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${NOTION_API_KEY}`,
+        "Notion-Version": NOTION_VERSION,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+      },
+    }, (res) => { res.on("data", () => {}); res.on("end", resolve); });
+    req.on("error", () => resolve());
+    req.write(payload);
+    req.end();
+  });
+}
 
 exports.handler = async (event) => {
   try {
@@ -49,6 +86,13 @@ exports.handler = async (event) => {
 
     if (status !== TARGET_STATUS) {
       return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: `status is "${status}"` }) };
+    }
+
+    // Pause flag check — if true, drop the dispatch and notify on Notion.
+    if (await isFactoryPaused()) {
+      console.log(`Factory paused — skipping dispatch for ${featureId}`);
+      await postNotionComment(featureId, "🛑 Nova Factory is currently PAUSED — see CloudWatch alarms. This feature was not dispatched. Resume by setting /nova/factory/paused = false after diagnosing.");
+      return { statusCode: 200, body: JSON.stringify({ paused: true, skipped: true, featureId }) };
     }
 
     // Check that all dependencies are Done before dispatching
