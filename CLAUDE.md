@@ -1,5 +1,23 @@
 # Nova — Master Project Context
 
+> This repo contains **two distinct things**:
+> 1. **The Product** (`app/`, `frontend/`, application `infra/` modules) — the
+>    Nova Tech DD platform. Most of the rules in this file describe HOW the
+>    product is built and constrained.
+> 2. **The Factory** (`.factory/`, `infra/factory/`, `infra/bootstrap/`,
+>    `infra/webhook-relay/`, `scripts/factory_lambdas/`, `tests/factory/`) —
+>    an autonomous CI/CD pipeline that builds the product. It runs in AWS,
+>    triggers off Notion webhooks, and merges PRs to `main`. It is governed
+>    by its own docs at [`docs/factory/README.md`](docs/factory/README.md);
+>    only a brief orientation lives here.
+>
+> When in doubt about which set of rules applies: if you're writing app code
+> (FastAPI routes, React components, RDS migrations), follow the Product
+> sections. If you're touching factory plumbing (state machines, Lambdas,
+> the implementer's system prompt), read the factory docs first.
+
+---
+
 ## Product
 Nova is a **Technical Due Diligence (Tech DD) Platform** for PE M&A transactions.
 
@@ -15,50 +33,77 @@ via cloud connectors and is guided through the process.
 - **Sellers** — target company engineering teams; connect tooling, respond to
   questionnaires, manage their data per-engagement
 
-## Factory
-This repository is built and maintained by the **Nova Software Factory v2** —
-a deterministic Step Functions orchestrator that drives three LLM stages
-(Plan → Implement → Review) plus a deterministic Validate stage. The factory
-is described in detail in
-`docs/superpowers/specs/2026-05-03-factory-rebuild-design.md`.
+## Factory (orientation only — see [`docs/factory/README.md`](docs/factory/README.md) for details)
+
+The product is built and maintained by the **Nova Software Factory v2** — an
+autonomous AWS Step Functions pipeline that turns Notion features (status =
+"Ready to Build") into merged PRs on `main`. **Live as of 2026-05-04.**
+
+**One-line architecture:** deterministic Step Functions orchestrator with three
+LLM stages (Plan → Implement → Review) plus a deterministic Validate stage,
+ending in a PR + GitHub Actions quality gates + auto-merge + post-deploy probe.
 
 **Pipeline (v2):**
 Notion → Webhook Lambda → Step Functions `nova-factory-v2` → Plan (Haiku)
-→ PlanGate → RalphLoop (≤ 6 turns of Sonnet, container Lambda) → Validate
-(deterministic ruff/mypy/pytest/tf/tsc) → Review (Sonnet) → CommitAndPush →
-OpenPR → quality-gates.yml → MarkDone. A separate state machine
-`nova-factory-postdeploy` probes staging after each merge and can revert.
+→ PlanGate → RalphLoop (≤6 turns of Sonnet, container Lambda) → Validate
+(deterministic ruff/mypy/pytest/tf/tsc) → Review (Sonnet) → CommitAndPush v2
+→ OpenPR → quality-gates.yml → MarkDone. After merge, `nova-factory-postdeploy`
+probes staging from the merged commit's `.factory/last-run/prd.json` and
+auto-reverts via the GitHub Tree API on failure.
 
-**Cutover status:** v2 is **live** as of 2026-05-04. The webhook routes to
-`nova-factory-v2` (`FACTORY_BACKEND="step-functions-v2"`). v1
-(`nova-factory-pipeline`) and the legacy `factory.yml` GitHub Actions
-workflow are retained as emergency fallback for 30 days; deletion happens
-in the cleanup half of Phase 6 around 2026-06-04.
+**Pause / unpause:** SSM parameter `/nova/factory/paused` (string `true`/`false`).
+The webhook relay reads this on every delivery; auto-pause flips it on alarm
+or budget breach. **Auto-pause never auto-resumes** — humans reset deliberately.
 
-**Canonical factory artifacts** (committed to this repo):
+**Canonical factory artifacts in this repo:**
 
 | Path | Purpose |
 |---|---|
-| `.factory/prd.schema.json`             | JSON Schema for the structured PRD emitted by Plan and consumed by every later stage. |
-| `.factory/feature-sizing-rubric.md`    | Deterministic sizing rubric Plan enforces — humans use it to self-size before filing. |
-| `.factory/implementer-system.md`       | System prompt RalphTurn concatenates with this CLAUDE.md when invoking `claude -p`. |
-| `.factory/reviewer-system.md`          | System prompt Review uses; encodes the four review categories and the JSON contract. |
-| `tests/factory/`                        | Unit tests for the schemas and (Phase 2+) the factory Lambdas. |
+| `.factory/prd.schema.json`            | JSON Schema for the PRD emitted by Plan; the contract every later stage relies on. |
+| `.factory/feature-sizing-rubric.md`   | Deterministic sizing thresholds — humans use this to self-size before filing in Notion. |
+| `.factory/implementer-system.md`      | System prompt the RalphTurn container injects on every `claude -p` invocation. |
+| `.factory/reviewer-system.md`         | Reviewer system prompt; encodes the four review categories (security/tenancy/spec/migration). |
 
-**Sandbox boundaries:** RalphTurn writes only to its execution's S3 prefix
-and the Lambda-local `/tmp/ws`. Anything it tries to write under
-`.github/workflows/`, `.factory/` (except the `.factory/_DONE_` completion
-sentinel), `infra/factory/`, or any path containing `..` or absolute paths is
-DENIED at upload time and surfaced back as `DENIED:` lines in
-`repair_context.md` for the next turn. The factory's GitHub PAT is
-fine-grained, single-repo, `contents:write` + `pull_requests:write` only —
-no `workflow` scope, no admin.
+**Sandbox boundary the factory enforces against itself:** the implementer's
+writes under `.github/workflows/`, `.factory/` (except `.factory/_DONE_`),
+`infra/factory/`, or paths containing `..`/absolute prefixes are rejected at
+the post-turn upload step (see [`scripts/factory_lambdas/containers/ralph_turn/allowlist.py`](scripts/factory_lambdas/containers/ralph_turn/allowlist.py)). The factory's GitHub PAT lacks `workflow` scope — even
+if the allowlist were bypassed, CI cannot be edited.
 
-Never manually edit files that the factory owns unless you update this doc
-and the relevant `.factory/*` prompt to reflect it.
+**Operating the factory (cheat sheet):**
+```bash
+# Pause (humans only — no auto-resume)
+MSYS_NO_PATHCONV=1 aws ssm put-parameter --name /nova/factory/paused --value true  --type String --overwrite
+MSYS_NO_PATHCONV=1 aws ssm put-parameter --name /nova/factory/paused --value false --type String --overwrite
+
+# Manually start an execution (skipping the Notion webhook)
+aws stepfunctions start-execution \
+  --state-machine-arn arn:aws:states:us-east-1:577638385116:stateMachine:nova-factory-v2 \
+  --name "manual-$(date +%s)" --input '{"feature_id":"<notion-page-uuid>"}'
+
+# Tail the implementer
+MSYS_NO_PATHCONV=1 aws logs tail /aws/lambda/nova-factory-ralph-turn --follow
+
+# Smoke test (creates a synthetic Notion page + waits for terminal)
+bash scripts/factory_smoke_v2.sh trivial
+```
+
+**Where to read more about the factory:**
+- Operator's guide: [`docs/factory/README.md`](docs/factory/README.md) (architecture, AWS resources, common ops, cost model, sandbox layers)
+- Incident runbook: [`docs/runbooks/factory-incident.md`](docs/runbooks/factory-incident.md)
+- Original design rationale: [`docs/superpowers/specs/2026-05-03-factory-rebuild-design.md`](docs/superpowers/specs/2026-05-03-factory-rebuild-design.md)
+- Implementation history (Phase 1–6): [`docs/superpowers/plans/2026-05-03-factory-v2-phase{1..6}-*.md`](docs/superpowers/plans/)
+
+> **Rule of thumb for app agents:** never edit `.factory/*`, `infra/factory/*`,
+> `infra/bootstrap/*`, `infra/webhook-relay/*`, `scripts/factory_lambdas/*`,
+> `tests/factory/*`, `.github/workflows/quality-gates.yml`, or
+> `.github/workflows/deploy.yml` unless you're explicitly working on the
+> factory itself. Edits to those paths are rejected by the implementer's
+> sandbox allowlist and surface as `DENIED:` lines in the next turn.
 
 ## Secrets Strategy — Hard Requirement
-All secrets follow a strict tiering. Violations will be caught by the Security Reviewer and block the build.
+All secrets follow a strict tiering. Violations are caught by the factory's
+Review stage (security category) and block the PR.
 
 | Where secret lives | What goes here |
 |---|---|
@@ -215,21 +260,21 @@ Buyer Report Delivered → Clarification Q&A → Deal Outcome
 ## Coding Conventions
 - All code must have tests before merging
 - All tests must pass in CI before merging (pytest, ruff, mypy)
-- Security Reviewer must pass before any commit lands
+- The factory's Review stage (Sonnet) must return `passed: true` with no
+  blockers in the security/tenancy/spec/migration categories before the
+  PR can be opened
 - Every Terraform change runs `terraform validate` and `terraform plan` before apply
 - Multi-tenancy: all queries must filter by `buyer_org_id` — row-level security
   enforced at DB layer
-- Backend agent always updates `requirements.txt` when adding new dependencies
+- Always update `requirements.txt` when adding new Python dependencies
 - Use Alembic for all database migrations (not raw SQL files)
 - Python: SQLAlchemy 2.x async (`mapped_column`, `AsyncSession`); modern type hints
   (`X | None` not `Optional[X]`, `dict` not `Dict`)
 
-## Agent Roles
-See `.claude/agents/` for each agent's system prompt.
-Orchestrator coordinates all agents. Do not call agents directly.
-
 ## Repository Layout
-- `app/` — web application
+
+**App (the Tech DD platform):**
+- `app/` — Python backend
   - `app/api/routes/` — FastAPI route handlers (thin, delegate to services)
   - `app/services/` — business logic
   - `app/repositories/` — data access (always filter by `buyer_org_id`)
@@ -238,14 +283,28 @@ Orchestrator coordinates all agents. Do not call agents directly.
   - `app/core/` — config, database, auth utilities
   - `app/db/migrations/` — Alembic migrations
   - `app/workers/` — SQS consumer workers (async scan jobs)
-  - `app/agents/` — LangGraph agent definitions
+  - `app/agents/` — LangGraph agent definitions (these are *application* agents
+    that scan seller code; not the build-system agents that put them there)
 - `frontend/` — React 18 + TypeScript SPA
-- `infra/` — Terraform modules
-- `infra/bootstrap/` — one-time S3/DynamoDB state backend setup
-- `scripts/` — factory tooling
-- `.claude/agents/` — agent system prompts
-- `docs/` — specs and plans
-- `docs/openapi.json` — always up to date, committed by factory on API changes
+- `infra/` (excluding `infra/factory/`, `infra/bootstrap/`, `infra/webhook-relay/`) — application Terraform modules (RDS, Cognito, ECS Fargate, etc.)
+- `tests/` (excluding `tests/factory/`) — application test suite. The factory runs this in `Validate`.
+- `docs/openapi.json` — always up to date; committed by the factory on every run that touches the API.
+
+**Factory (the build system; managed by [`docs/factory/README.md`](docs/factory/README.md)):**
+- `.factory/` — schema + system prompts the factory's LLMs read at runtime
+- `infra/factory/` — Lambdas, state machines, IAM, dashboard, alarms, budgets
+- `infra/bootstrap/` — one-time S3 state bucket + DDB lock table
+- `infra/webhook-relay/` — Notion webhook → SFN dispatch Lambda
+- `scripts/factory_lambdas/` — source code for all factory Lambdas (handlers, common helpers, container images)
+- `scripts/factory_smoke_fixtures/` + `factory_smoke_v2.sh` — synthetic feature fixtures + smoke runner
+- `scripts/setup_notion*.py`, `notion_client.py`, `create_foundation_features.py` — one-time setup utilities for the Notion DB
+- `tests/factory/` — unit tests for factory code (59 tests; runs independently of the app)
+- `.github/workflows/quality-gates.yml`, `.github/workflows/deploy.yml` — post-PR validation + deploy
+
+**Shared / docs:**
+- `docs/factory/` — factory operator's guide
+- `docs/runbooks/` — incident runbooks
+- `docs/superpowers/` — design specs and implementation plans for the factory rebuild
 
 ## Tech Stack Decisions (maintained by Architect agent)
 
