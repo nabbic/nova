@@ -52,8 +52,26 @@ def _run(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
     return p.returncode, p.stdout, p.stderr
 
 
+# Exclude paths from ruff/mypy: these are vendored deps or build artifacts
+# present in the workspace but not maintained by the implementer.
+RUFF_EXCLUDES = [
+    "infra/factory/lambda-layer/python",
+    "infra/*/python",          # any other layer-build outputs
+    ".terraform",
+    "node_modules",
+    "__pycache__",
+    ".pytest_cache",
+    "dist",
+    ".venv",
+]
+
+
 def _step_ruff() -> list[dict]:
-    rc, out, err = _run([sys.executable, "-m", "ruff", "check", "--output-format=json", "."], WS_ROOT)
+    cmd = [sys.executable, "-m", "ruff", "check", "--output-format=json"]
+    for ex in RUFF_EXCLUDES:
+        cmd.extend(["--extend-exclude", ex])
+    cmd.append(".")
+    rc, out, err = _run(cmd, WS_ROOT)
     if rc == 0:
         return []
     try:

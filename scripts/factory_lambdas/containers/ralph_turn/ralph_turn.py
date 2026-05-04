@@ -285,14 +285,23 @@ def _upload_workspace(execution_id: str) -> None:
     pack_git(WS_ROOT, tarball)
     _s3.upload_file(str(tarball), BUCKET, f"{execution_id}/{GIT_TGZ_KEY_SUFFIX}")
 
-    # Upload everything else (skip .git itself — it's in the tarball)
-    for f in WS_ROOT.rglob("*"):
-        if not f.is_file():
+    # Use git to enumerate paths — tracked + untracked-but-not-ignored.
+    # This respects .gitignore so we don't upload vendored deps, build
+    # artifacts, __pycache__, etc.
+    p = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        cwd=WS_ROOT, capture_output=True, text=True, check=True,
+    )
+    rels = [r for r in p.stdout.split("\0") if r]
+    print(f"[ralph] uploading {len(rels)} files (gitignore-respecting)", flush=True)
+
+    for rel in rels:
+        if rel.startswith(".git/") or rel == ".git":
             continue
-        rel = f.relative_to(WS_ROOT).as_posix()
-        if rel == ".git" or rel.startswith(".git/"):
+        local = WS_ROOT / rel
+        if not local.is_file():
             continue
-        _s3.upload_file(str(f), BUCKET, f"{prefix}{rel}")
+        _s3.upload_file(str(local), BUCKET, f"{prefix}{rel}")
 
 
 def handler(event, _ctx):
