@@ -74,11 +74,14 @@ EXEC_ARN=$(aws stepfunctions start-execution \
   --query executionArn --output text)
 echo "==> Started execution $EXEC_NAME"
 
-# Poll
-for _ in $(seq 1 60); do
+# Poll up to 45 min (end-to-end with RalphLoop + Validate + Review + quality-gates)
+for i in $(seq 1 270); do
   STATUS=$(aws stepfunctions describe-execution --execution-arn "$EXEC_ARN" --query status --output text)
   if [[ "$STATUS" != "RUNNING" ]]; then break; fi
-  sleep 5
+  if (( i % 6 == 0 )); then
+    echo "    [$(date +%H:%M:%S)] still RUNNING ($((i*10))s elapsed)"
+  fi
+  sleep 10
 done
 echo "==> Execution status: $STATUS"
 

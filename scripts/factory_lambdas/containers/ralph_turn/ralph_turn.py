@@ -159,42 +159,76 @@ def _run_claude(user_prompt: str) -> dict:
     The Claude Code CLI (--output-format json) emits a JSON object on stdout.
     """
     env = {**os.environ, "ANTHROPIC_API_KEY": _get_anthropic_key(), "HOME": "/tmp"}
+    # Pass user prompt via stdin to avoid ARG_MAX (Linux default ~128KB) when
+    # the repair_context.md grows large after Validate failures.
+    sys_prompt = _system_prompt()
     cmd = [
         "claude",
-        "-p", user_prompt,
+        "-p",
         "--model", RALPH_MODEL,
         "--max-turns", str(RALPH_MAX_INNER_TURNS),
         "--output-format", "json",
         "--dangerously-skip-permissions",
-        "--system-prompt", _system_prompt(),
+        "--append-system-prompt", sys_prompt,
     ]
+    print(f"[ralph] invoking claude (prompt {len(user_prompt)} chars, system {len(sys_prompt)} chars)", flush=True)
     started = time.time()
-    proc = subprocess.run(cmd, cwd=WS_ROOT, env=env, capture_output=True, text=True, timeout=780)
+    proc = subprocess.run(cmd, cwd=WS_ROOT, env=env, capture_output=True, text=True,
+                          input=user_prompt, timeout=780)
     elapsed = time.time() - started
+    print(f"[ralph] claude exit={proc.returncode} elapsed={elapsed:.0f}s stdout_len={len(proc.stdout)} stderr_len={len(proc.stderr)}", flush=True)
+    if proc.stderr:
+        print(f"[ralph] claude stderr (last 1000 chars):\n{proc.stderr[-1000:]}", flush=True)
     if proc.returncode != 0:
         raise RuntimeError(f"claude exit {proc.returncode}: stderr=\n{proc.stderr[-4000:]}\nstdout=\n{proc.stdout[-2000:]}")
     try:
         out = json.loads(proc.stdout)
     except json.JSONDecodeError:
         raise RuntimeError(f"claude returned non-JSON: {proc.stdout[-2000:]}")
+    # Log the result summary
+    result_text = (out.get("result") or "")[:1500]
+    print(f"[ralph] claude result (first 1500 chars):\n{result_text}", flush=True)
     out["_elapsed_s"] = elapsed
     return out
 
 
-def _scan_changed_paths() -> list[str]:
-    """Anything in the working tree (relative to WS_ROOT) that git considers different from HEAD."""
+def _current_head_sha() -> str:
+    """HEAD sha, or empty string if no commits yet."""
+    p = subprocess.run(["git", "rev-parse", "HEAD"], cwd=WS_ROOT, capture_output=True, text=True)
+    return p.stdout.strip() if p.returncode == 0 else ""
+
+
+def _scan_changed_paths(pre_turn_sha: str) -> list[str]:
+    """All paths changed during this turn — both uncommitted (status) and
+    committed by claude (diff vs pre-turn HEAD)."""
+    paths: set[str] = set()
+
+    # Uncommitted: working tree + index vs HEAD
     out = subprocess.run(
         ["git", "status", "--porcelain", "-z"],
         cwd=WS_ROOT, capture_output=True, text=True, check=True,
     )
-    paths: list[str] = []
     for entry in out.stdout.split("\0"):
         if not entry:
             continue
-        path = entry[3:].strip() if len(entry) > 3 else entry.strip()
+        # Format is "XY <path>" — at least 4 chars before the path
+        path = entry[3:].strip() if len(entry) >= 4 else entry.strip()
         if path:
-            paths.append(path)
-    return paths
+            paths.add(path)
+
+    # Claude may have committed via its bash tool — capture commits since pre-turn HEAD
+    if pre_turn_sha:
+        out2 = subprocess.run(
+            ["git", "diff", "--name-only", "-z", f"{pre_turn_sha}..HEAD"],
+            cwd=WS_ROOT, capture_output=True, text=True, check=False,
+        )
+        if out2.returncode == 0:
+            for path in out2.stdout.split("\0"):
+                path = path.strip()
+                if path:
+                    paths.add(path)
+
+    return sorted(paths)
 
 
 def _enforce_allowlist(changed: list[str], repair_context_path: Path) -> tuple[list[str], list[str]]:
@@ -274,10 +308,11 @@ def handler(event, _ctx):
     progress = _read_optional(progress_path)
     repair   = _read_optional(repair_path)
 
+    pre_turn_sha = _current_head_sha()
     user_prompt = _build_user_prompt(prd, progress, repair)
     claude_out  = _run_claude(user_prompt)
 
-    changed = _scan_changed_paths()
+    changed = _scan_changed_paths(pre_turn_sha)
     allowed, denied = _enforce_allowlist(changed, repair_path)
 
     new_progress = progress.rstrip()

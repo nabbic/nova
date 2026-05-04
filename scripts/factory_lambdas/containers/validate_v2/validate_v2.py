@@ -154,21 +154,28 @@ def handler(event, _ctx):
             break  # short-circuit on first failure
 
     passed = len(issues) == 0
-    payload = {"passed": passed, "issues": issues}
 
+    # Persist full issues to S3 (no SFN size constraint there)
     _s3.put_object(
         Bucket=BUCKET,
         Key=f"{execution_id}/validate/issues.json",
-        Body=json.dumps(payload, indent=2).encode("utf-8"),
+        Body=json.dumps({"passed": passed, "issues": issues}, indent=2).encode("utf-8"),
         ContentType="application/json",
     )
 
     if not passed:
+        # Cap repair_context to 30KB so the next RalphTurn's CLI args stay
+        # under ARG_MAX (Linux default ~128KB).
+        REPAIR_CAP = 30_000
         body = "# Validate failures (must address before re-validation)\n\n"
         for it in issues:
-            body += f"## {it['tool']} — {it['file']}:{it['line']}\n\n{it['output']}\n\n"
+            chunk = f"## {it['tool']} — {it['file']}:{it['line']}\n\n{it['output'][:500]}\n\n"
             if it.get("hint"):
-                body += f"_Hint:_ {it['hint']}\n\n"
+                chunk += f"_Hint:_ {it['hint']}\n\n"
+            if len(body) + len(chunk) > REPAIR_CAP:
+                body += f"\n_… ({len(issues) - issues.index(it)} more issues truncated for size)_\n"
+                break
+            body += chunk
         _s3.put_object(
             Bucket=BUCKET,
             Key=f"{execution_id}/workspace/repair_context.md",
@@ -176,4 +183,13 @@ def handler(event, _ctx):
             ContentType="text/markdown",
         )
 
-    return payload
+    # Return only summary to SFN (256KB payload limit)
+    by_tool: dict[str, int] = {}
+    for it in issues:
+        by_tool[it["tool"]] = by_tool.get(it["tool"], 0) + 1
+    return {
+        "passed":         passed,
+        "issue_count":    len(issues),
+        "by_tool":        by_tool,
+        "first_issues":   issues[:5],   # tiny preview for debugging
+    }
