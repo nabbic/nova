@@ -7,6 +7,7 @@ locals {
     load_feature = { timeout = 60,  memory = 512  }
     plan         = { timeout = 120, memory = 1024 }
     mark_blocked = { timeout = 30,  memory = 256  }
+    review       = { timeout = 180, memory = 1024 }
   }
 }
 

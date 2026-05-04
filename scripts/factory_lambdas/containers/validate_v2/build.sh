@@ -13,6 +13,13 @@ aws ecr describe-repositories --repository-names "$REPO" --region "$REGION" >/de
 
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_REPO"
 
-docker build --platform linux/amd64 -f "$HERE/Dockerfile" -t "$ECR_REPO:latest" "$REPO_ROOT"
-docker push "$ECR_REPO:latest"
+# Lambda only supports Docker v2 manifests, not OCI — disable buildx attestations.
+docker buildx build \
+  --platform linux/amd64 \
+  --provenance=false \
+  --sbom=false \
+  --push \
+  -f "$HERE/Dockerfile" \
+  -t "$ECR_REPO:latest" \
+  "$REPO_ROOT"
 echo "Pushed $ECR_REPO:latest"
