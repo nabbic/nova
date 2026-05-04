@@ -1,13 +1,12 @@
+# Shared handlers — used by both v1 (deleted at cutover but listed for emergency
+# fallback) and v2. The v1-only handlers (load_spec, load_project_context,
+# run_orchestrator, run_agent, evaluate_security, commit_and_push) were removed
+# at the 2026-05-04 cutover. v2 supersedes commit_and_push with commit_and_push_v2
+# in lambdas-v2.tf.
 locals {
   handlers = {
     acquire_lock                 = { timeout = 30,  memory = 256  }
     release_lock                 = { timeout = 30,  memory = 256  }
-    load_spec                    = { timeout = 60,  memory = 512  }
-    load_project_context         = { timeout = 30,  memory = 256  }
-    run_orchestrator             = { timeout = 300, memory = 2048 }
-    run_agent                    = { timeout = 600, memory = 2048 }
-    evaluate_security            = { timeout = 30,  memory = 256  }
-    commit_and_push              = { timeout = 300, memory = 1024 }
     update_notion                = { timeout = 30,  memory = 256  }
     trigger_quality_gates        = { timeout = 30,  memory = 256  }
     handle_quality_gate_callback = { timeout = 30,  memory = 256  }
@@ -19,7 +18,7 @@ resource "null_resource" "build_handlers" {
     src_hash = sha256(join("", [
       for f in fileset("${path.module}/../../scripts/factory_lambdas", "**") :
       filemd5("${path.module}/../../scripts/factory_lambdas/${f}")
-      if !startswith(f, "dist/") && !startswith(f, "agent_prompts/") && !startswith(f, "containers/")
+      if !startswith(f, "dist/") && !startswith(f, "containers/")
     ]))
   }
   provisioner "local-exec" {
