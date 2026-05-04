@@ -333,6 +333,27 @@ def handler(event, _ctx):
     progress_path.write_text(new_progress.lstrip() + "\n", encoding="utf-8")
 
     _commit_intra_turn()
+
+    # Write a diff.patch (origin/main..HEAD) for the Review Lambda to read.
+    diff_path = WS_ROOT / "diff.patch"
+    diff_proc = subprocess.run(
+        ["git", "diff", "origin/main..HEAD"],
+        cwd=WS_ROOT, capture_output=True, text=True,
+    )
+    if diff_proc.returncode == 0:
+        diff_path.write_text(diff_proc.stdout, encoding="utf-8")
+        print(f"[ralph] wrote diff.patch ({len(diff_proc.stdout)} bytes)", flush=True)
+    else:
+        # Fallback: diff against pre_turn_sha (works even without origin/main ref)
+        if pre_turn_sha:
+            diff_proc = subprocess.run(
+                ["git", "diff", pre_turn_sha, "HEAD"],
+                cwd=WS_ROOT, capture_output=True, text=True,
+            )
+            if diff_proc.returncode == 0:
+                diff_path.write_text(diff_proc.stdout, encoding="utf-8")
+                print(f"[ralph] wrote diff.patch via pre_turn_sha ({len(diff_proc.stdout)} bytes)", flush=True)
+
     _upload_workspace(execution_id)
 
     # Clear the repair context if it had been present going INTO the turn
