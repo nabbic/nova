@@ -29,11 +29,11 @@ Notion → Webhook Lambda → Step Functions `nova-factory-v2` → Plan (Haiku)
 OpenPR → quality-gates.yml → MarkDone. A separate state machine
 `nova-factory-postdeploy` probes staging after each merge and can revert.
 
-**Cutover status:** v2 is being built in parallel with v1. The webhook still
-routes to the legacy `nova-factory-pipeline` until Phase 6 of the rebuild
-flips `FACTORY_BACKEND="step-functions-v2"`. The legacy `factory.yml`
-GitHub Actions workflow remains as emergency fallback and is removed 30 days
-after stable v2 cutover.
+**Cutover status:** v2 is **live** as of 2026-05-04. The webhook routes to
+`nova-factory-v2` (`FACTORY_BACKEND="step-functions-v2"`). v1
+(`nova-factory-pipeline`) and the legacy `factory.yml` GitHub Actions
+workflow are retained as emergency fallback for 30 days; deletion happens
+in the cleanup half of Phase 6 around 2026-06-04.
 
 **Canonical factory artifacts** (committed to this repo):
 

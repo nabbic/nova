@@ -78,7 +78,10 @@ resource "aws_iam_role_policy" "lambda_states" {
     Statement = [{
       Effect   = "Allow"
       Action   = "states:StartExecution"
-      Resource = data.terraform_remote_state.factory.outputs.state_machine_arn
+      Resource = [
+        data.terraform_remote_state.factory.outputs.state_machine_arn,    # v1 (kept for emergency fallback)
+        data.terraform_remote_state.factory.outputs.v2_state_machine_arn, # v2 (active post-cutover)
+      ]
     }]
   })
 }
@@ -138,8 +141,8 @@ resource "aws_lambda_function" "webhook_relay" {
       GITHUB_REPO       = var.github_repo
       GITHUB_TOKEN      = data.aws_secretsmanager_secret_version.github_token.secret_string
       NOTION_API_KEY    = data.aws_secretsmanager_secret_version.notion_api_key.secret_string
-      FACTORY_BACKEND   = "github-actions"  # flip to "step-functions" in Phase 8 cutover
-      STATE_MACHINE_ARN = data.terraform_remote_state.factory.outputs.state_machine_arn
+      FACTORY_BACKEND   = "step-functions-v2"  # 2026-05-04 cutover: was "github-actions"
+      STATE_MACHINE_ARN = data.terraform_remote_state.factory.outputs.v2_state_machine_arn
       PAUSED_PARAM      = "/nova/factory/paused"
     }
   }

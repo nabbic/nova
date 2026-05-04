@@ -117,9 +117,9 @@ exports.handler = async (event) => {
       }
     }
 
-    if (FACTORY_BACKEND === "step-functions") {
+    if (FACTORY_BACKEND === "step-functions" || FACTORY_BACKEND === "step-functions-v2") {
       await startStateMachine(featureId);
-      console.log(`Step Functions triggered for feature ${featureId}`);
+      console.log(`Step Functions triggered for feature ${featureId} (${FACTORY_BACKEND})`);
     } else {
       await triggerGitHubActions(featureId);
       console.log(`Factory triggered for feature ${featureId} via GitHub Actions`);
