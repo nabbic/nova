@@ -65,7 +65,7 @@ if [[ -z "$FEATURE_ID" || "$FEATURE_ID" == "null" ]]; then
 fi
 echo "    feature_id = $FEATURE_ID"
 
-SM_ARN=$(terraform -chdir="$REPO_ROOT/infra/factory" output -raw v2_planonly_state_machine_arn)
+SM_ARN=$(terraform -chdir="$REPO_ROOT/infra/factory" output -raw v2_state_machine_arn)
 EXEC_NAME="smoke-${FIXTURE}-$(date +%s)"
 EXEC_ARN=$(aws stepfunctions start-execution \
   --state-machine-arn "$SM_ARN" \
