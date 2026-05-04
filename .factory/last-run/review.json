@@ -1,5 +1,22 @@
 {
   "passed": true,
   "blockers": [],
-  "warnings": []
+  "warnings": [
+    {
+      "category": "security",
+      "file": "app/core/auth.py",
+      "line": 17,
+      "description": "jwt.get_unverified_claims is used without signature verification; tokens are accepted if structurally valid but not cryptographically verified against Cognito's public keys."
+    },
+    {
+      "category": "migration",
+      "file": "app/models/engagement.py",
+      "description": "Engagement ORM model added but no Alembic migration script is present in the diff; table must exist in the DB before the endpoint is deployed."
+    },
+    {
+      "category": "spec",
+      "file": "git_diff",
+      "description": "Diff truncated at 50KB; tail of tests/unit/api/test_engagements.py not visible \u2014 confirm no acceptance-criterion tests were cut off."
+    }
+  ]
 }
