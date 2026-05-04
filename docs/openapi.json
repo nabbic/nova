@@ -1,0 +1,78 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Nova API",
+    "version": "2.0"
+  },
+  "paths": {
+    "/api/version": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Get Version",
+        "operationId": "get_version_api_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Version Api Version Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/version-v2": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Get Version V2",
+        "operationId": "get_version_v2_api_version_v2_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Version V2 Api Version V2 Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

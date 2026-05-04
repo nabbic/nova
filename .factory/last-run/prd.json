@@ -1,0 +1,35 @@
+{
+  "feature_id": "3560930a-bc71-8196-b211-f94b49fee668",
+  "title": "Factory v2 smoke \u2013 version v2 endpoint",
+  "narrative_md": "# Factory v2 smoke \u2013 version v2 endpoint\n\n## Description\n\nAdd GET /api/version-v2 returning {\"version\": \"2.0\"}.\n\n## Tech Notes\n\nAdd to app/api/routes/version.py. Mirror the existing /api/version handler. Update docs/openapi.json.\n\n## Acceptance Criteria\n\n- 200 with {\"version\": \"2.0\"} when called without auth\n- docs/openapi.json includes /api/version-v2\n\n## Out of Scope\n\nAuth changes; non-v2 endpoints",
+  "stories": [
+    {
+      "id": "s1",
+      "description": "Add GET /api/version-v2 endpoint returning version 2.0",
+      "acceptance_criteria": [
+        "Returns 200 with {\"version\": \"2.0\"} when called without auth"
+      ],
+      "passes": false
+    },
+    {
+      "id": "s2",
+      "description": "Update OpenAPI schema with /api/version-v2 endpoint",
+      "acceptance_criteria": [
+        "docs/openapi.json includes /api/version-v2"
+      ],
+      "passes": false
+    }
+  ],
+  "scope": {
+    "touches_db": false,
+    "touches_frontend": false,
+    "touches_infra": false,
+    "files_in_scope": [
+      "app/api/routes/version.py",
+      "docs/openapi.json"
+    ]
+  },
+  "hard_blockers": [],
+  "risk_flags": [],
+  "suggested_split": []
+}
