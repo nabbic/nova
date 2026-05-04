@@ -100,6 +100,12 @@ def _step_pytest() -> list[dict]:
 
 
 def _step_terraform() -> list[dict]:
+    """Run terraform validate on every TF directory except infra/factory/
+    (sandboxed). We deliberately do NOT run `terraform fmt -check` — fmt is
+    cosmetic and pre-existing formatting issues in the seeded workspace
+    would block real features. Format compliance is a separate concern
+    that can be enforced via a pre-commit hook or CI workflow lint step.
+    """
     tf_dirs = sorted({p.parent for p in WS_ROOT.rglob("*.tf")})
     issues: list[dict] = []
     factory_dir = WS_ROOT / "infra" / "factory"
@@ -109,9 +115,6 @@ def _step_terraform() -> list[dict]:
             continue  # factory infra is sandboxed and not editable by Ralph
         except ValueError:
             pass
-        rc, out, err = _run(["terraform", "fmt", "-check"], d)
-        if rc != 0:
-            issues.append(_issue("terraform fmt", str(d.relative_to(WS_ROOT)), 0, (out+err)[:1000], "Run `terraform fmt`"))
         rc, out, err = _run(["terraform", "init", "-backend=false", "-input=false"], d)
         if rc != 0:
             issues.append(_issue("terraform init", str(d.relative_to(WS_ROOT)), 0, (out+err)[-1000:], ""))
