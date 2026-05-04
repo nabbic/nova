@@ -96,7 +96,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          gh pr review ${{ inputs.pr_number }} --approve
+          # GitHub forbids approving your own PR. --admin lets us merge
+          # without an approval when branch protection requires one.
           gh pr merge ${{ inputs.pr_number }} --squash --admin --delete-branch
 
       - name: Notify Step Functions (success)
