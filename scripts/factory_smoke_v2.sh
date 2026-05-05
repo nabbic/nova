@@ -92,6 +92,15 @@ NOTION_STATUS=$(curl -s -H "Authorization: Bearer $NOTION_API_KEY" \
   | jq -r '.properties.Status.status.name // .properties.Status.select.name // "unknown"')
 echo "==> Notion page status: $NOTION_STATUS"
 
+# Archive the synthetic Notion page so the Features DB stays clean.
+# The page lingers in Notion's trash for 30 days if you need it.
+curl -s -X PATCH "https://api.notion.com/v1/pages/$FEATURE_ID" \
+  -H "Authorization: Bearer $NOTION_API_KEY" \
+  -H "Notion-Version: 2022-06-28" \
+  -H "Content-Type: application/json" \
+  -d '{"archived": true}' > /dev/null
+echo "==> Archived the synthetic Notion page (in trash, recoverable for 30 days)"
+
 case "$EXPECTED" in
   plan_passes_no_blockers)
     if [[ "$STATUS" == "SUCCEEDED" && "$NOTION_STATUS" != "Failed" ]]; then
