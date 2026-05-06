@@ -1,4 +1,0 @@
-## Turn 1
-- elapsed: 100s
-- changed (allowed): ['app/api/health.py', 'app/main.py', 'docs/openapi.json', 'prd.json', 'progress.txt', 'tests/test_health_info.py']
-
