@@ -1,19 +1,5 @@
 {
   "passed": true,
   "blockers": [],
-  "warnings": [
-    {
-      "category": "spec",
-      "file": "tests/test_docker.py",
-      "line": 23,
-      "description": "test_app_main_importable does not assert docker build succeeded first; if nova-api:test image is stale or absent, the test may fail or produce a misleading error rather than a clear skip/dependency failure",
-      "fix": "Add a fixture or ordering dependency so test_app_main_importable only runs after test_docker_build passes, or use pytest-depends / explicit image presence check."
-    },
-    {
-      "category": "spec",
-      "file": "docker-compose.yml",
-      "description": "PRD specifies 'docker compose down cleanly removes both containers and the postgres volume' but the compose file visible in the diff does not declare a named volume for the db service; without a named volume, 'docker compose down -v' removes the anonymous volume, which may surprise users expecting a named volume lifecycle.",
-      "fix": "Add a named volume (e.g. 'pgdata') under services.db and declare it in a top-level 'volumes:' block so lifecycle is explicit."
-    }
-  ]
+  "warnings": []
 }
