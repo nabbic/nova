@@ -16,6 +16,10 @@ node_modules/
 # Factory workspace (ephemeral per run)
 .factory-workspace/
 
+# Factory per-run scratch — agent state belongs in S3, never in the app repo
+.factory/last-run/
+.factory/_DONE_
+
 # Serena IDE tooling
 .serena/
 

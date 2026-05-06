@@ -1,4 +1,0 @@
-## Turn 1
-- elapsed: 230s
-- changed (allowed): ['.dockerignore', 'Dockerfile', 'docker-compose.yml', 'prd.json', 'progress.txt', 'tests/test_docker.py']
-
