@@ -13,12 +13,9 @@ __pycache__/
 # Node
 node_modules/
 
-# Factory workspace (ephemeral per run)
+# Factory artifacts must never appear in this repo — they live in nabbic/nova-factory
+.factory/
 .factory-workspace/
-
-# Factory per-run scratch — agent state belongs in S3, never in the app repo
-.factory/last-run/
-.factory/_DONE_
 
 # Serena IDE tooling
 .serena/

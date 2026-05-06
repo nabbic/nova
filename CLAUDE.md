@@ -16,9 +16,17 @@ via cloud connectors and is guided through the process.
   questionnaires, manage their data per-engagement
 
 ## Factory
-This repository is built and maintained by the Nova Software Factory — an autonomous
-multi-agent CI/CD pipeline. Features flow from Notion → GitHub Actions → AWS.
-Never manually edit files that agents own unless you update this doc to reflect it.
+This repository is built by the **Nova Software Factory**, which lives in its own
+repo at [`nabbic/nova-factory`](https://github.com/nabbic/nova-factory). Features
+flow Notion → factory webhook → AWS Step Functions → PR here → quality-gates.yml
+auto-merge. The factory clones this repo into its Lambda runtime and produces a
+PR; it does not write factory state into this repo's git history.
+
+If you need to change factory behaviour (state machine, agent prompts, allowlist,
+Lambda code, Terraform), do it in `nabbic/nova-factory`, not here. Edits to
+`infra/factory/`, `infra/webhook-relay/`, `.factory/`, or `agent-prompts/` from
+the factory's own runtime are rejected by the Ralph-turn allowlist and surface
+as `DENIED:` lines in the next turn.
 
 ## Secrets Strategy — Hard Requirement
 All secrets follow a strict tiering. Violations will be caught by the Security Reviewer and block the build.
