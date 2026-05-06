@@ -1,9 +1,0 @@
-.git
-tests/
-infra/
-frontend/
-.env
-__pycache__
-*.pyc
-*.pyo
-.pytest_cache
